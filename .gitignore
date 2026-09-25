@@ -1,0 +1,14 @@
+samples/
+*.xlsx
+*.docx
+*.xls
+*.csv
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+.streamlit/secrets.toml
+.DS_Store
+
+# Working notes: they name real firms and batches, so they stay on this machine.
+PROGRESS.md

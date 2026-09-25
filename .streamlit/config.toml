@@ -1,0 +1,11 @@
+# Keep this app entirely local: no usage statistics leave the machine.
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+address = "127.0.0.1"
+
+# No base is pinned, so the app follows whatever theme you pick in the app's
+# menu (top right) -> Settings -> Theme. Streamlit does not allow the theme to
+# be switched from inside the page, so that menu is the switch.
