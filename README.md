@@ -98,20 +98,53 @@ and which files are duplicates of one already read.
 
 ## Install and run
 
+You need Python 3.12 or newer, and git.
+
+### Where the commands go
+
+Type the commands below into a **terminal**, one line at a time, pressing
+Enter after each. Any of these works:
+
+- **VS Code:** open the built-in terminal with **Terminal > New Terminal**.
+- **Windows with WSL:** the Ubuntu app.
+- **Windows without WSL:** PowerShell. Use the activate line shown in the
+  comment on the right.
+- **macOS or Linux:** the Terminal app.
+
+A terminal starts in your home folder, so the `cd` line moves it into the
+project folder. Every later command must be run from there.
+
+### First time: download and set up
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+git clone https://github.com/jolgan/submission-metrics-checker.git
+cd submission-metrics-checker
+python3 -m venv .venv
+source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
 pip install -r requirements.txt
 python tools/make_synthetic_samples.py
+```
+
+On Windows, type `python` where it says `python3`.
+
+### Every time: start the app
+
+```bash
+cd submission-metrics-checker
+source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
 streamlit run app.py
 ```
 
-Opens at <http://127.0.0.1:8501>. Drag in submission documents, the Power BI
-export, and optionally the Staff Portal export.
+Then open <http://127.0.0.1:8501> in your browser. Drag in submission
+documents, the Power BI export, and optionally the Staff Portal export.
 
-The app must be restarted, not just refreshed, after changes to `parsing.py`,
+The app runs for as long as that terminal stays open. To **stop** it, click
+into the terminal and press **Ctrl+C**. To **restart** it, stop it and run
+`streamlit run app.py` again.
+
+Restart it, not just refresh the browser, after changes to `parsing.py`,
 `matching.py` or `export_writer.py`. Streamlit keeps imported modules in memory
-for the life of the process.
+for as long as it runs.
 
 ## Project structure
 
