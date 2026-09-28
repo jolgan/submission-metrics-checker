@@ -182,6 +182,19 @@ def practice_area_variants(value: Any) -> set[str]:
     return forms
 
 
+def _canonical_area(value: Any) -> str:
+    """A practice area's own name, with a repeated trailing level dropped.
+
+    "Finance > Banking and finance > Banking and finance" and "Finance >
+    Banking and finance" are one name; "City focus - Porto Alegre > Tax" and
+    "Tax" are not.
+    """
+    parts = [p.strip() for p in normalise(value).split(" > ") if p.strip()]
+    while len(parts) >= 2 and _level_words(parts[-1]) == _level_words(parts[-2]):
+        parts = parts[:-1]
+    return " > ".join(parts)
+
+
 def to_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
@@ -202,14 +215,34 @@ class PowerBIExport:
     notes: list[str] = field(default_factory=list)
 
     def lookup(self, firm: str, region: str, practice_area: str) -> list[dict]:
+        """Export rows for a firm, region and practice area.
+
+        Spellings are tried from the most specific to the least. They used to
+        be tried in set order, which Python shuffles from one run to the next:
+        "City focus - Porto Alegre > Tax > ..." matched its own row on one run
+        and, trying the bare "tax" first, two rows on another.
+
+        A bare spelling can still find several rows, because a City focus row
+        is also indexed under its area alone. A row whose own name is exactly
+        the one asked for is then the one meant: the firm's national "Tax"
+        submission is the "Tax" row, not "City focus - Porto Alegre > Tax".
+        """
         firm_key, region_key = normalise(firm), normalise(region)
         found: list[dict] = []
-        for form in practice_area_variants(practice_area):
+        for form in sorted(practice_area_variants(practice_area), key=lambda f: (-len(f), f)):
             for row in self.index.get((firm_key, region_key, form), []):
                 if not any(row is seen for seen in found):
                     found.append(row)
             if found:
                 break
+        if len(found) > 1:
+            wanted = _canonical_area(practice_area)
+            exact = [
+                r for r in found
+                if _canonical_area(r.get("CONCATENATED_PRACTICE_AREA_NAME")) == wanted
+            ]
+            if exact:
+                found = exact
         return found
 
     def lookup_ignoring_region(self, firm: str, practice_area: str) -> list[dict]:
@@ -383,7 +416,7 @@ class PortalExport:
         match exists.
         """
         found: list[dict] = []
-        for form in sorted(practice_area_variants(value), key=len, reverse=True):
+        for form in sorted(practice_area_variants(value), key=lambda f: (-len(f), f)):
             for record in self.by_area.get(form, []):
                 if not any(record is seen for seen in found):
                     found.append(record)
