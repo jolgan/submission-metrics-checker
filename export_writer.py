@@ -86,7 +86,7 @@ def _write_recount_sheet(sheet, results, overrides=None, checked=None) -> None:
                 cell.fill = AMBER
                 notes = row.document.metrics[key].notes if row.document.metrics else []
                 heading = (
-                    "Not counted from the document - this is the Power BI "
+                    "Not counted from the document. This is the Power BI "
                     "export's own figure, unverified."
                     if unverified
                     else "Counted, but worth checking."
@@ -101,7 +101,7 @@ def _write_recount_sheet(sheet, results, overrides=None, checked=None) -> None:
                 cell.fill = GREEN
                 decided = "you" if value != row.recount(key) else "the recount"
                 cell.comment = _comment(
-                    f"Differs from the export.\n"
+                    f"Differs from the Power BI export.\n"
                     f"Power BI export: {row.export_value(key)}\n"
                     f"This file: {value}  (decided by {decided})"
                 )
@@ -121,7 +121,7 @@ def _write_changes_sheet(sheet, results, overrides=None) -> None:
         "Practice area",
         "Filename",
         "Metric",
-        "Export value",
+        "Power BI value",
         "Recounted value",
         "Decided by",
     ]

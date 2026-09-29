@@ -102,7 +102,7 @@ def _arithmetic(results, table_results, duplicates, superseded, report) -> str:
         parts.append(_sum("Staff Portal page", rows))
         if report.repeats:
             parts.append(
-                f"{len(report.repeats)} line(s) repeat the line above in the export. "
+                f"{len(report.repeats)} line(s) repeat the line above in the Staff Portal export. "
                 "Each is counted as a document of its own."
             )
 
@@ -128,7 +128,7 @@ def _arithmetic(results, table_results, duplicates, superseded, report) -> str:
             )
         elif report.unclear:
             parts.append(
-                f"Every document the export names is uploaded, but "
+                f"Every document the Staff Portal export names is uploaded, but "
                 f"{len(report.unclear)} line(s) need checking on the page."
             )
         else:
@@ -180,7 +180,7 @@ with left:
         type=["docx"],
         accept_multiple_files=True,
         help="Drag in as many as you like. A full firm of ~114 documents takes "
-        "about 15 seconds, and uploading the lot each time keeps one export "
+        "about 15 seconds, and uploading the lot each time keeps one downloaded results file "
         "covering everything you have downloaded so far.",
     )
     count = len(doc_files or [])
@@ -258,8 +258,8 @@ with st.expander("Staff Portal row order (optional)", expanded=False):
                     "Which column holds the practice area?",
                     pasted.column_labels,
                     index=pasted.suggested,
-                    help="Each column shows how many of its values the exports "
-                    "recognise as practice areas or file names.",
+                    help="Each column shows how many of its values the Power BI or Staff "
+                    "Portal export recognises as practice areas or file names.",
                 )
             )
 
@@ -384,8 +384,8 @@ if report is not None:
             (
                 "Check on the page",
                 len(report.unclear),
-                "The export repeats the line above, so the app can't tell which "
-                "document these are.",
+                "The Staff Portal export repeats the line above, so the app can't "
+                "tell which document these are.",
             ),
         ]
         for column, (label, value, hint) in zip(st.columns(len(tiles)), tiles):
@@ -405,7 +405,7 @@ if report is not None:
                 f"**Check {len(report.unclear)} line(s) on the portal page.** If "
                 "the page shows a different person or file there, download it."
             )
-            st.markdown(_lines(report.unclear, lambda r: f" · same export row as line {r.repeat_of}"))
+            st.markdown(_lines(report.unclear, lambda r: f" · same Staff Portal row as line {r.repeat_of}"))
 
         if report.unreadable:
             st.warning(f"**Could not be read ({len(report.unreadable)})**")
@@ -471,8 +471,8 @@ if duplicates:
     )
 if unmatched:
     problems.append(
-        f"- **{len(unmatched)}** document(s) could not be matched to an export "
-        "row:\n"
+        f"- **{len(unmatched)}** document(s) could not be matched to a Power BI "
+        "export row:\n"
         + "\n".join(f"    - `{r.source_filename or r.filename}`" for r in unmatched)
     )
 numbering = [
@@ -630,7 +630,7 @@ with table_col:
 
     with toggle_col:
         show_original = st.toggle(
-            "Show the export's original value alongside corrections",
+            "Show the Power BI value alongside corrections",
             value=False,
             help="Off: corrected numbers only. On: shows '22 (was 20)' in every "
             "changed cell.",
@@ -662,8 +662,8 @@ with table_col:
     with st.popover("Show the maths", icon=":material/calculate:"):
         st.markdown(_arithmetic(results, table_results, duplicates, superseded, report))
     st.caption(
-        "**Green**: differs from the Power BI export. **Amber**: needs a look - "
-        "either not counted (the cell shows the export's figure) or counted but "
+        "**Green**: differs from the Power BI export. **Amber**: needs a look, "
+        "either not counted (the cell shows the Power BI figure) or counted but "
         "unusual. Type over a figure and the colours follow it."
     )
 
@@ -888,7 +888,7 @@ if page_col is not None:
             st.markdown(
                 "- ✅ **uploaded** — in your batch and in the table\n"
                 "- ❌ **missing** — the portal has a document, but it wasn't uploaded\n"
-                "- 🔍 **check on the page** — the export repeats the line above, so "
+                "- 🔍 **check on the page** — the Staff Portal export repeats the line above, so "
                 "look at the page: a different person or file there means another "
                 "document to download\n"
                 "- ⚠️ **could not be read** — uploaded, but the file wouldn't open\n"
@@ -908,7 +908,7 @@ st.subheader(
     help=(
         "One entry per file you added, showing where each number was counted from.\n\n"
         "**The mark on each entry:**\n\n"
-        "- ✅ **counted** — matched to an export row and included in the table\n"
+        "- ✅ **counted** — matched to a Power BI export row and included in the table\n"
         "- 🕓 **older version, not counted** — two files here are for the same "
         "firm, region and practice area. The newer one was counted (it is the ✅ "
         "entry); this older one was left out of the table. It is listed only so "
@@ -970,11 +970,11 @@ for row in results:
             if metric.is_unparsed:
                 verdict = f"❓ **{UNPARSED}**"
             elif row.differs(key):
-                verdict = f"🟩 **{recount}** — export said {export_value}"
+                verdict = f"🟩 **{recount}**: Power BI said {export_value}"
             elif export_value is None:
-                verdict = f"**{recount}** — no export value to compare"
+                verdict = f"**{recount}**: no Power BI value to compare"
             else:
-                verdict = f"**{recount}** — matches the export"
+                verdict = f"**{recount}**: matches Power BI"
 
             st.markdown(f"**{METRIC_LABELS[key]}**: {verdict}")
             if metric.evidence:

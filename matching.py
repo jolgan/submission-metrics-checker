@@ -306,7 +306,7 @@ def load_powerbi(source: Any) -> PowerBIExport:
     missing_metrics = [c for c in EXPORT_COLUMNS.values() if c not in columns]
     if missing_metrics:
         export.notes.append(
-            "Export is missing metric column(s): " + ", ".join(missing_metrics)
+            "The Power BI export is missing metric column(s): " + ", ".join(missing_metrics)
         )
 
     for position, raw in enumerate(sheet.iter_rows(min_row=2)):
@@ -338,7 +338,7 @@ def load_powerbi(source: Any) -> PowerBIExport:
     if duplicates:
         export.notes.append(
             f"{len(duplicates)} firm/region/practice-area key(s) appear more than "
-            "once in the export; documents matching them are reported as ambiguous."
+            "once in the Power BI export; documents matching them are reported as ambiguous."
         )
     return export
 
@@ -886,7 +886,8 @@ def build_portal_order(pasted: PastedOrder, column: int | None = None) -> Portal
             hint = f" {pasted.column_labels[best]!r} looks like the right one."
         raise ValueError(
             f"None of the {order.size} values in {order.column_label!r} are practice "
-            f"areas or file names the exports know about, so this column cannot "
+            f"areas or file names the Power BI or Staff Portal export knows, so "
+            f"this column cannot "
             f"order the table.{hint}"
         )
 
@@ -1100,9 +1101,9 @@ def build_results(
             row.status = "unmatched"
             row.issues.append(
                 f"No {' or '.join(missing)} for this document, so it could not be "
-                "matched to an export row. The Staff Portal export did not supply "
+                "matched to a Power BI export row. The Staff Portal export did not supply "
                 + ("it" if len(missing) == 1 else "them")
-                + " (is this filename in the export?), and the document's own "
+                + " (is this filename in the Staff Portal export?), and the document's own "
                 "practice-area dropdown was left unselected."
             )
             results.append(row)
@@ -1132,8 +1133,8 @@ def build_results(
         elif len(candidates) > 1:
             row.status = "ambiguous"
             row.issues.append(
-                f"{len(candidates)} export rows share this firm, region and practice "
-                "area; not comparing against any of them."
+                f"{len(candidates)} Power BI export rows share this firm, region and "
+                "practice area; not comparing against any of them."
             )
         else:
             row.status = "unmatched"
@@ -1142,19 +1143,19 @@ def build_results(
             if near:
                 regions = sorted({str(r.get("COUNTRY_NAME") or "?") for r in near})
                 row.issues.append(
-                    "No export row for this firm, region and practice area. The same "
+                    "No Power BI export row for this firm, region and practice area. The same "
                     f"firm and practice area exist under region(s): {', '.join(regions)}."
                 )
             elif relaxed:
                 spellings = sorted({str(r.get("FIRM_NAME") or "?") for r in relaxed})
                 row.issues.append(
-                    f"No export row for firm {row.firm!r}. The export spells this firm "
-                    f"{' / '.join(repr(s) for s in spellings)} for this practice area - "
+                    f"No Power BI export row for firm {row.firm!r}. Power BI spells this firm "
+                    f"{' / '.join(repr(s) for s in spellings)} for this practice area, so "
                     "check the firm name before treating this as a genuine mismatch."
                 )
             else:
                 row.issues.append(
-                    "No export row for this firm, region and practice area."
+                    "No Power BI export row for this firm, region and practice area."
                 )
 
         row.issues.extend(doc.warnings)
@@ -1265,7 +1266,7 @@ def _crosscheck_portal(row: ResultRow, doc: ParsedDocument, record: dict) -> Non
             row.issues.append(
                 f"The practice-area dropdown was not used. The typed box reads "
                 f"{typed!r}, which does not match the Staff Portal export "
-                f"({portal_area!r}) - the export has been used."
+                f"({portal_area!r}). The Staff Portal export has been used."
             )
 
 
@@ -1365,7 +1366,7 @@ def review_rows(
             if needs_attention(row, metric):
                 flags.append("check the numbering")
             if final_differs(row, metric, overrides):
-                flags.append("differs from export")
+                flags.append("differs from Power BI")
             if not flags and not everything:
                 continue
             out.append(
@@ -1453,7 +1454,7 @@ def review_note(
         name = METRIC_COLUMNS[metric]
         if final_value(row, metric, overrides) is None:
             original = row.export_value(metric)
-            baseline = f", export says {original}" if original is not None else ""
+            baseline = f", Power BI says {original}" if original is not None else ""
             parts.append(f"{name}: not counted{baseline}")
         elif needs_attention(row, metric, checked):
             found = row.document.metrics.get(metric)
@@ -1556,7 +1557,7 @@ def collapse_superseded(results: list[ResultRow]) -> list[ResultRow]:
             note = (
                 f"{len(rows)} submissions share this firm, region and practice area "
                 f"and carry the same date ({created_at_text(winner.portal_record)}), "
-                f"so which is newer cannot be told from the portal export. "
+                f"so which is newer cannot be told from the Staff Portal export. "
                 f"{winner.filename!r} was counted - check this one by hand."
             )
             winner.issues.append(note)
@@ -1916,7 +1917,7 @@ def difference_records(
                     "Practice area": row.practice_area,
                     "Filename": row.filename,
                     "Metric": METRIC_LABELS[key],
-                    "Export value": row.export_value(key),
+                    "Power BI value": row.export_value(key),
                     "Recounted value": value,
                     "Decided by": (
                         "you" if value != row.recount(key) else "the app"

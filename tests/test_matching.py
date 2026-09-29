@@ -187,7 +187,7 @@ def test_unmatched_document_is_reported_not_dropped(powerbi, portal):
     rows = build_results([doc], powerbi, portal)
     assert len(rows) == 1
     assert rows[0].status == "unmatched"
-    assert any("No export row" in i for i in rows[0].issues)
+    assert any("No Power BI export row" in i for i in rows[0].issues)
 
 
 def test_unmatched_row_suggests_the_regions_that_do_exist(powerbi, portal):

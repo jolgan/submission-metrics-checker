@@ -379,7 +379,7 @@ def test_the_review_note_carries_the_baseline_for_an_uncounted_cell(results):
     try:
         note = review_note(row, {})
         assert "MATTERS: not counted" in note
-        assert f"export says {original}" in note
+        assert f"Power BI says {original}" in note
     finally:
         row.document.metrics["matters"].value = EXPECTED["alpha"]["matters"]
 
