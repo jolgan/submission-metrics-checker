@@ -187,3 +187,94 @@ def test_the_hash_form_is_counted_as_non_publishable_too(tmp_path):
     metric = submission(tmp_path, ["Non-publishable #Matter 1", "Publishable #Matter 1"])
     assert metric.value == 2
     assert metric.numbering_gap is False
+
+
+# --- labels punctuated the firm's own way -----------------------------------
+#
+# A scan of 578 real submissions found eight label shapes the parser read as no
+# matter at all. One firm wrote "Publishable - Matter 1" and "Publishable matter
+# - 4" for its first six boxes, so 20 matters counted as 14; another wrote
+# "Non-publishable matter7" with no space before the number.
+
+PUNCTUATED = [
+    "Publishable - Matter 1",
+    "Publishable – Matter 1",
+    "Publishable matter - 1",
+    "Publishable matter: 1",
+    "Non-publishable matter1",
+    "Non-publishable matter - 1",
+    "Non-publishable matter – 1",
+    "Non-publishable – Matter 1",
+    "Non Publishable matter 1",
+]
+
+
+@pytest.mark.parametrize("label", PUNCTUATED)
+def test_a_punctuated_label_is_a_matter(tmp_path, label):
+    assert submission(tmp_path, [label]).value == 1
+
+
+@pytest.mark.parametrize("label", [
+    "Publishable matter summary",
+    "Publishable - Matter description",
+    "Non-publishable matter summary",
+])
+def test_headings_that_merely_start_like_a_label_are_not_matters(tmp_path, label):
+    assert submission(tmp_path, [label, "Publishable matter 1"]).value == 1
+
+
+def test_a_label_without_its_hyphen_is_still_non_publishable(tmp_path):
+    """"Non Publishable matter 1" next to "Publishable matter 1" is no repeat."""
+    metric = submission(tmp_path, ["Publishable matter 1", "Non Publishable matter 1"])
+    assert metric.numbering_gap is False
+
+
+def test_the_reported_document_shape(tmp_path):
+    """Six publishable boxes with dashes, then non-publishable 7 to 20."""
+    labels = ["Publishable - Matter 1", "Publishable - Matter 2", "Publishable – Matter 3"]
+    labels += [f"Publishable matter - {n}" for n in (4, 5, 6)]
+    labels += [f"Non-publishable matter {n}" for n in range(7, 21)]
+    metric = submission(tmp_path, labels)
+    assert metric.value == 20
+    assert metric.numbering_gap is False
+
+
+# --- numbering that runs across both kinds ----------------------------------
+
+
+def test_numbering_straight_through_both_kinds_is_not_a_gap(tmp_path):
+    labels = [f"Publishable matter {n}" for n in (1, 2, 3)]
+    labels += [f"Non-publishable matter {n}" for n in (4, 5, 6)]
+    assert submission(tmp_path, labels).numbering_gap is False
+
+
+def test_interleaved_numbering_is_not_a_gap(tmp_path):
+    labels = ["Publishable matter 1", "Publishable matter 2", "Non-publishable matter 3",
+              "Publishable matter 4", "Non-publishable matter 5"]
+    assert submission(tmp_path, labels).numbering_gap is False
+
+
+def test_a_gap_in_both_readings_is_still_reported(tmp_path):
+    labels = ["Publishable matter 1", "Publishable matter 2", "Non-publishable matter 4"]
+    metric = submission(tmp_path, labels)
+    assert metric.numbering_gap is True
+    assert "no 3" in " ".join(metric.notes)
+
+
+def test_a_mistyped_number_gives_a_short_note(tmp_path):
+    """One firm typed 230 for 30; the note named all 200 numbers between."""
+    labels = [f"Publishable matter {n}" for n in range(1, 30)] + ["Non-publishable matter 230"]
+    metric = submission(tmp_path, labels)
+    assert metric.value == 30
+    assert metric.numbering_gap is True
+    note = next(n for n in metric.notes if "numbered up to" in n)
+    assert "no 30 to 229" in note
+    assert len(note) < 400
+
+
+def test_missing_numbers_are_written_as_ranges():
+    from parsing import _ranges
+
+    assert _ranges([5, 7, 8, 9] + list(range(30, 230))) == "5, 7 to 9, 30 to 229"
+    assert _ranges([3, 4]) == "3, 4"
+    assert _ranges([14]) == "14"

@@ -73,7 +73,16 @@ RE_CLIENT_TABLE = re.compile(r"^active key clients", re.I)
 # templates leave them unnumbered. The number is therefore optional, and an
 # unnumbered label has to end there: the work highlights section is introduced
 # by a heading reading "Publishable matter summary", which is not a matter.
-RE_MATTER_TABLE = re.compile(r"^(non-)?publishable\s+#?\s*matter(\s+\d+|\s*$)", re.I)
+# Firms punctuate the label freely: "Publishable - Matter 1", "Publishable
+# matter - 4", "Non-publishable matter7", "Non Publishable matter 8". A dash or
+# colon may sit on either side of "matter", and the space before the number
+# may be missing.
+_MATTER_LABEL = (
+    r"^(?P<non>non\s*-?\s*)?publishable\s*[-–—:]?\s*#?\s*matter"
+)
+RE_MATTER_TABLE = re.compile(
+    _MATTER_LABEL + r"(\s*[-–—:#]?\s*\d+|\s*$)", re.I
+)
 # A nomination label is "<role>: <descriptor> <number>". Firms invent their own
 # descriptors - "leading counsel", "to become next generation partner" - so the
 # role before the colon is the reliable part, and the descriptor only has to
@@ -323,7 +332,7 @@ def label_segments(
 
 # The same "#Matter 1" spelling has to be read here, or a document using it
 # looks like fourteen missing matters rather than fourteen counted ones.
-RE_MATTER_NUMBER = re.compile(r"^(non-)?publishable\s+#?\s*matter\s+(\d+)", re.I)
+RE_MATTER_NUMBER = re.compile(_MATTER_LABEL + r"\s*[-–—:#]?\s*(?P<number>\d+)", re.I)
 
 
 @dataclass
@@ -653,8 +662,8 @@ def count_matters(tables: list[Table]) -> Metric:
             metric.evidence.append(label)
             seen = RE_MATTER_NUMBER.match(label)
             if seen:
-                kind = "Non-publishable" if seen.group(1) else "Publishable"
-                numbered[kind].append(int(seen.group(2)))
+                kind = "Non-publishable" if seen.group("non") else "Publishable"
+                numbered[kind].append(int(seen.group("number")))
 
     if metric.value == 0 and empty == 0:
         metric.value = None
@@ -682,27 +691,68 @@ def count_matters(tables: list[Table]) -> Metric:
     # A last sanity check: the matters a firm numbers 1..N should come to N.
     # A gap is usually the firm deleting a matter without renumbering, but it is
     # also what an undercount looks like, so it is always reported.
-    for kind, seen in numbered.items():
-        if not seen:
+    #
+    # Most firms number each kind from 1, but some number straight through
+    # both ("Publishable matter 6", then "Non-publishable matter 7"), and some
+    # interleave them. Either way is fine as long as one of the two readings
+    # runs 1..N; where neither does, the one leaving fewer gaps is reported.
+    per_kind = {kind: seen for kind, seen in numbered.items() if seen}
+    combined = [n for seen in per_kind.values() for n in seen]
+    if not combined or all(_runs_from_one(seen) for seen in per_kind.values()):
+        return metric
+    if _runs_from_one(combined):
+        return metric
+
+    metric.numbering_gap = True
+    readings = {"per kind": per_kind, "combined": {"Matters": combined}}
+    chosen = min(
+        readings.values(),
+        key=lambda groups: sum(len(_gaps(seen)[0]) for seen in groups.values()),
+    )
+    for kind, seen in chosen.items():
+        if _runs_from_one(seen):
             continue
-        highest = max(seen)
-        if len(seen) == highest and sorted(seen) == list(range(1, highest + 1)):
-            continue
-        metric.numbering_gap = True
-        absent = sorted(set(range(1, highest + 1)) - set(seen))
-        repeated = sorted({n for n in seen if seen.count(n) > 1})
+        absent, repeated = _gaps(seen)
         detail = []
         if absent:
-            detail.append("no " + ", ".join(str(n) for n in absent))
+            detail.append("no " + _ranges(absent))
         if repeated:
-            detail.append("repeated " + ", ".join(str(n) for n in repeated))
+            detail.append("repeated " + _ranges(repeated))
+        across = " across publishable and non-publishable" if kind == "Matters" else ""
+        label = kind if kind == "Matters" else f"{kind} matters"
         metric.notes.append(
-            f"{kind} matters are numbered up to {highest} but {len(seen)} were "
+            f"{label} are numbered up to {max(seen)}{across} but {len(seen)} were "
             f"counted ({'; '.join(detail)}). Usually the firm deleted one without "
-            "renumbering - but it is also what a missed matter looks like, so "
-            "check this document's matters by hand."
+            "renumbering, or mistyped a number, but it is also what a missed "
+            "matter looks like, so check this document's matters by hand."
         )
     return metric
+
+
+def _runs_from_one(numbers: list[int]) -> bool:
+    """True if the numbers are exactly 1..N, each once."""
+    return sorted(numbers) == list(range(1, len(numbers) + 1))
+
+
+def _gaps(numbers: list[int]) -> tuple[list[int], list[int]]:
+    """(numbers missing below the highest, numbers used more than once)."""
+    absent = sorted(set(range(1, max(numbers) + 1)) - set(numbers))
+    repeated = sorted({n for n in numbers if numbers.count(n) > 1})
+    return absent, repeated
+
+
+def _ranges(numbers: list[int]) -> str:
+    """'5, 7 to 9, 30 to 229': runs written as ranges, so a typo stays short."""
+    runs: list[list[int]] = []
+    for n in numbers:
+        if runs and n == runs[-1][-1] + 1:
+            runs[-1].append(n)
+        else:
+            runs.append([n])
+    return ", ".join(
+        str(r[0]) if len(r) == 1 else f"{r[0]}, {r[1]}" if len(r) == 2 else f"{r[0]} to {r[-1]}"
+        for r in runs
+    )
 
 
 def nomination_segments(table: Table) -> list[tuple[str, str, int, int]]:

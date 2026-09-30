@@ -975,6 +975,10 @@ for row in results:
                 verdict = f"**{recount}**: no Power BI value to compare"
             else:
                 verdict = f"**{recount}**: matches Power BI"
+            if not metric.is_unparsed and (metric.numbering_gap or metric.needs_check):
+                # Amber in the table, so not a confident green here: the note
+                # below says why the figure itself may be wrong.
+                verdict = verdict.replace("🟩 ", "") + " 🟨 **worth a look, see the note below**"
 
             st.markdown(f"**{METRIC_LABELS[key]}**: {verdict}")
             if metric.evidence:
