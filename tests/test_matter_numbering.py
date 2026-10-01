@@ -278,3 +278,35 @@ def test_missing_numbers_are_written_as_ranges():
     assert _ranges([5, 7, 8, 9] + list(range(30, 230))) == "5, 7 to 9, 30 to 229"
     assert _ranges([3, 4]) == "3, 4"
     assert _ranges([14]) == "14"
+
+
+# --- the non-publishable box worded another way -----------------------------
+#
+# One firm labelled its last red, non-publishable box "Confidential matter 5"
+# after "Non-publishable matter 1" to 4, so 26 matters counted as 25. Others
+# wrote "Non-published matter 9" and, by a slip, "Son-publishable matter 3".
+
+
+@pytest.mark.parametrize("label", [
+    "Confidential matter 1",
+    "Confidential Matter 1",
+    "Confidential - Matter 1",
+    "Non-published matter 1",
+    "Son-publishable matter 1",
+])
+def test_another_wording_of_a_non_publishable_box_is_a_matter(tmp_path, label):
+    assert submission(tmp_path, [label]).value == 1
+
+
+def test_a_confidential_box_continues_the_non_publishable_numbering(tmp_path):
+    """The reported shape: Non-publishable 1 to 4, then Confidential 5."""
+    labels = [f"Publishable matter {n}" for n in range(1, 22)]
+    labels += [f"Non-publishable matter {n}" for n in range(1, 5)]
+    labels.append("Confidential matter 5")
+    metric = submission(tmp_path, labels)
+    assert metric.value == 26
+    assert metric.numbering_gap is False
+
+
+def test_confidential_matter_summary_is_not_a_matter(tmp_path):
+    assert submission(tmp_path, ["Confidential matter summary", "Publishable matter 1"]).value == 1

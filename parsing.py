@@ -77,8 +77,13 @@ RE_CLIENT_TABLE = re.compile(r"^active key clients", re.I)
 # matter - 4", "Non-publishable matter7", "Non Publishable matter 8". A dash or
 # colon may sit on either side of "matter", and the space before the number
 # may be missing.
+#
+# Some firms word the non-publishable box differently: "Confidential matter 5"
+# (in the red, non-publishable colour), "Non-published matter 9", and a typed
+# slip of the first letter, "Son-publishable matter 3". All are non-publishable.
 _MATTER_LABEL = (
-    r"^(?P<non>non\s*-?\s*)?publishable\s*[-–—:]?\s*#?\s*matter"
+    r"^(?:(?P<non>[a-z]?on\s*-?\s*)?publish(?:able|ed)|(?P<confidential>confidential))"
+    r"\s*[-–—:]?\s*#?\s*matter"
 )
 RE_MATTER_TABLE = re.compile(
     _MATTER_LABEL + r"(\s*[-–—:#]?\s*\d+|\s*$)", re.I
@@ -662,7 +667,8 @@ def count_matters(tables: list[Table]) -> Metric:
             metric.evidence.append(label)
             seen = RE_MATTER_NUMBER.match(label)
             if seen:
-                kind = "Non-publishable" if seen.group("non") else "Publishable"
+                non_publishable = seen.group("non") or seen.group("confidential")
+                kind = "Non-publishable" if non_publishable else "Publishable"
                 numbered[kind].append(int(seen.group("number")))
 
     if metric.value == 0 and empty == 0:
