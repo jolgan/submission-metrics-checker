@@ -284,7 +284,7 @@ def test_missing_numbers_are_written_as_ranges():
 #
 # One firm labelled its last red, non-publishable box "Confidential matter 5"
 # after "Non-publishable matter 1" to 4, so 26 matters counted as 25. Others
-# wrote "Non-published matter 9" and, by a slip, "Son-publishable matter 3".
+# wrote "Non-published matter 9".
 
 
 @pytest.mark.parametrize("label", [
@@ -292,7 +292,6 @@ def test_missing_numbers_are_written_as_ranges():
     "Confidential Matter 1",
     "Confidential - Matter 1",
     "Non-published matter 1",
-    "Son-publishable matter 1",
 ])
 def test_another_wording_of_a_non_publishable_box_is_a_matter(tmp_path, label):
     assert submission(tmp_path, [label]).value == 1
@@ -310,3 +309,117 @@ def test_a_confidential_box_continues_the_non_publishable_numbering(tmp_path):
 
 def test_confidential_matter_summary_is_not_a_matter(tmp_path):
     assert submission(tmp_path, ["Confidential matter summary", "Publishable matter 1"]).value == 1
+
+
+# --- the label box colour as a failsafe -------------------------------------
+#
+# The template colours every matter label: red for non-publishable, green for
+# publishable. One firm typed "Son-publishable matter 3"; rather than guess at
+# spellings, a red or green label box over a matter layout is counted and
+# named. The client tables share those colours, so the layout must match too.
+
+from docx.oxml.ns import qn  # noqa: E402
+
+RED, GREEN, GREY = "F1A3A3", "C5E0B3", "D0CECE"
+
+
+def shade(cell, fill):
+    props = cell._tc.get_or_add_tcPr()
+    shading = props.makeelement(qn("w:shd"), {qn("w:val"): "clear", qn("w:fill"): fill})
+    props.append(shading)
+
+
+def coloured(tmp_path, boxes, client_table_fill=None):
+    """boxes: (label, fill) pairs, each a full matter layout."""
+    document = Document()
+    document.add_paragraph("Firm Name")
+    document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
+    clients = document.add_table(rows=2, cols=2)
+    clients.rows[0].cells[0].text = "Active key clients (over the last 12 months)"
+    clients.rows[1].cells[0].text = "A Client Ltd"
+    if client_table_fill:
+        shade(clients.rows[0].cells[0], client_table_fill)
+    for label, fill in boxes:
+        table = document.add_table(rows=4, cols=2)
+        table.rows[0].cells[0].text = label
+        if fill:
+            shade(table.rows[0].cells[0], fill)
+        table.rows[1].cells[0].text = "Name of client"
+        table.rows[2].cells[0].text = "A client"
+        table.rows[3].cells[0].text = "Matter summary"
+    path = tmp_path / "coloured.docx"
+    document.save(path)
+    return parse_document(path).metrics
+
+
+def test_a_misspelt_red_box_is_counted_and_named(tmp_path):
+    metrics = coloured(tmp_path, [
+        ("Non-publishable matter 1", RED),
+        ("Non-publishable matter 2", RED),
+        ("Son-publishable matter 3", RED),
+    ])
+    matters = metrics["matters"]
+    assert matters.value == 3
+    assert matters.numbering_gap is False, "its number joins the non-publishable run"
+    assert any("Son-publishable matter 3" in n and "colour" in n for n in matters.notes)
+
+
+def test_a_misspelt_green_box_is_publishable(tmp_path):
+    matters = coloured(tmp_path, [
+        ("Publishable matter 1", GREEN),
+        ("Publishabel matter 2", GREEN),
+    ])["matters"]
+    assert matters.value == 2
+    assert matters.numbering_gap is False
+
+
+def test_an_uncoloured_box_with_an_unknown_label_is_not_guessed(tmp_path):
+    assert coloured(tmp_path, [("Publishable matter 1", GREEN), ("Son-publishable matter 2", None)])[
+        "matters"
+    ].value == 1
+
+
+def test_a_grey_box_is_not_a_matter_colour(tmp_path):
+    assert coloured(tmp_path, [("Publishable matter 1", GREEN), ("Something else 2", GREY)])[
+        "matters"
+    ].value == 1
+
+
+def test_a_red_client_table_is_not_counted_as_a_matter(tmp_path):
+    """The client tables use the same red and green."""
+    metrics = coloured(tmp_path, [("Publishable matter 1", GREEN)], client_table_fill=RED)
+    assert metrics["matters"].value == 1
+    assert metrics["active_clients"].value == 1
+
+
+def test_a_red_box_not_laid_out_as_a_matter_is_not_counted(tmp_path):
+    document = Document()
+    document.add_paragraph("Firm Name")
+    document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
+    for label in ("Publishable matter 1", "Important note"):
+        table = document.add_table(rows=2, cols=1)
+        table.rows[0].cells[0].text = label
+        table.rows[1].cells[0].text = "Name of client" if label.startswith("Pub") else "Some text"
+        shade(table.rows[0].cells[0], RED)
+    path = tmp_path / "note.docx"
+    document.save(path)
+    assert parse_document(path).metrics["matters"].value == 1
+
+
+def test_matter_colour_is_judged_by_hue():
+    from parsing import matter_colour
+
+    class Box:
+        def __init__(self, fill):
+            from docx import Document as New
+
+            table = New().add_table(rows=1, cols=1)
+            shade(table.rows[0].cells[0], fill)
+            self.table = table
+
+    for fill in ("F1A3A3", "EE0000", "D99594", "FC9299"):
+        assert matter_colour(Box(fill).table) == "Non-publishable", fill
+    for fill in ("C5E0B3", "B3E5A1", "A8D08D"):
+        assert matter_colour(Box(fill).table) == "Publishable", fill
+    for fill in ("D0CECE", "FFFFFF", "FFF2CC", "DAE8F8"):
+        assert matter_colour(Box(fill).table) is None, fill

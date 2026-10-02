@@ -12,6 +12,7 @@ numbers in labels repeat, so we count tables rather than trusting indices.
 
 from __future__ import annotations
 
+import colorsys
 import re
 from dataclasses import dataclass, field
 from typing import Any, Iterator
@@ -79,10 +80,11 @@ RE_CLIENT_TABLE = re.compile(r"^active key clients", re.I)
 # may be missing.
 #
 # Some firms word the non-publishable box differently: "Confidential matter 5"
-# (in the red, non-publishable colour), "Non-published matter 9", and a typed
-# slip of the first letter, "Son-publishable matter 3". All are non-publishable.
+# (in the red, non-publishable colour) and "Non-published matter 9". Both are
+# non-publishable. A typed slip such as "Son-publishable matter 3" is left to
+# the colour check in count_matters, which names it, rather than guessed here.
 _MATTER_LABEL = (
-    r"^(?:(?P<non>[a-z]?on\s*-?\s*)?publish(?:able|ed)|(?P<confidential>confidential))"
+    r"^(?:(?P<non>non\s*-?\s*)?publish(?:able|ed)|(?P<confidential>confidential))"
     r"\s*[-–—:]?\s*#?\s*matter"
 )
 RE_MATTER_TABLE = re.compile(
@@ -671,6 +673,32 @@ def count_matters(tables: list[Table]) -> Metric:
                 kind = "Non-publishable" if non_publishable else "Publishable"
                 numbered[kind].append(int(seen.group("number")))
 
+    # A failsafe for labels worded in a way nobody anticipated ("Son-publishable
+    # matter 3"): the template colours every matter label, red for
+    # non-publishable and green for publishable. Colour alone is not enough -
+    # the client tables use the same two colours - so the table must also be
+    # laid out as a matter, with a client name and a matter summary.
+    by_colour: list[str] = []
+    for index, table in enumerate(tables):
+        if index in adopted or carries_label(table):
+            continue
+        colour = matter_colour(table)
+        if colour is None or not laid_out_as_matter(table):
+            continue
+        label = table_label(table)
+        metric.value += 1
+        metric.evidence.append(label)
+        by_colour.append(label)
+        number = re.search(r"(\d+)\s*$", label)
+        if number:
+            numbered[colour].append(int(number.group(1)))
+    if by_colour:
+        listed = ", ".join(repr(label) for label in by_colour)
+        metric.notes.append(
+            f"{len(by_colour)} matter(s) counted from the colour of the label box, "
+            f"because the label is worded unusually: {listed}. Check it is a matter."
+        )
+
     if metric.value == 0 and empty == 0:
         metric.value = None
         metric.notes.append(
@@ -758,6 +786,50 @@ def _ranges(numbers: list[int]) -> str:
     return ", ".join(
         str(r[0]) if len(r) == 1 else f"{r[0]}, {r[1]}" if len(r) == 2 else f"{r[0]} to {r[-1]}"
         for r in runs
+    )
+
+
+def cell_fill(cell) -> str:
+    """A cell's background colour as 'RRGGBB', or '' if it has none."""
+    shading = cell._tc.find(f"{W}tcPr/{W}shd")
+    fill = (shading.get(f"{W}fill") or "") if shading is not None else ""
+    return fill.upper() if re.fullmatch(r"[0-9A-Fa-f]{6}", fill) else ""
+
+
+def matter_colour(table: Table) -> str | None:
+    """'Non-publishable' for a red label box, 'Publishable' for a green one.
+
+    Judged by hue rather than an exact colour, because firms' copies of the
+    template drift: the reds seen include F1A3A3, EE0000 and D99594, the greens
+    C5E0B3, B3E5A1 and A8D08D. Grey, white, yellow and blue are neither.
+    """
+    if not table.rows:
+        return None
+    cells = row_cells(table.rows[0])
+    fill = cell_fill(cells[0]) if cells else ""
+    if not fill:
+        return None
+    red, green, blue = (int(fill[i : i + 2], 16) / 255 for i in (0, 2, 4))
+    hue, _, saturation = colorsys.rgb_to_hls(red, green, blue)
+    if saturation < 0.25:
+        return None
+    degrees = hue * 360
+    if degrees < 15 or degrees > 345:
+        return "Non-publishable"
+    if 75 < degrees < 160:
+        return "Publishable"
+    return None
+
+
+RE_CLIENT_NAME_ROW = re.compile(r"^name of (the )?client", re.I)
+RE_MATTER_SUMMARY_ROW = re.compile(r"^matter (summary|description)", re.I)
+
+
+def laid_out_as_matter(table: Table) -> bool:
+    """True if the rows under the label are a matter's: client, then summary."""
+    firsts = [(row_text(row) or [""])[0] for row in table.rows[1:9]]
+    return any(RE_CLIENT_NAME_ROW.match(text) for text in firsts[:3]) and any(
+        RE_MATTER_SUMMARY_ROW.match(text) for text in firsts
     )
 
 
