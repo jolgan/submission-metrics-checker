@@ -190,3 +190,40 @@ def test_the_na_rule_fires_only_where_there_is_an_na_row():
     alpha = parse_document(SAMPLES["alpha"]).metrics["active_clients"]
     assert any("N/A" in n for n in gamma.notes), "gamma has an N/A client row"
     assert not any("N/A" in n for n in alpha.notes), "alpha does not"
+
+
+# --- answers in Spanish and Portuguese, and other shapes from real documents --
+#
+# A survey of 588 submissions found "Si", "Sí" and "Sim" for yes, "[No]" in
+# brackets and "Ye" for yes. Each one made the whole new-client column read
+# "double-check manually", so the checker had to count it by hand.
+
+
+@pytest.mark.parametrize("answer", ["Sí", "Si", "SI", "sí", "Sim", "sim", "Ye", "[Yes]", "(Sí)"])
+def test_another_language_or_shape_of_yes(tmp_path, answer):
+    new, _ = count(tmp_path, ["No", answer], name=f"{abs(hash(answer))}.docx")
+    assert new.value == 1, answer
+
+
+@pytest.mark.parametrize("answer", ["Não", "Nao", "[No]", "(No)", "No."])
+def test_another_language_or_shape_of_no(tmp_path, answer):
+    new, _ = count(tmp_path, ["Yes", answer], name=f"{abs(hash(answer))}.docx")
+    assert new.value == 1, answer
+
+
+def test_a_spanish_yes_is_not_treated_as_qualified(tmp_path):
+    new, _ = count(tmp_path, ["Sí", "Sim", "No"])
+    assert new.value == 2
+    assert not any("qualified" in n for n in new.notes)
+
+
+def test_a_typed_slip_is_counted_but_named(tmp_path):
+    new, _ = count(tmp_path, ["Ye", "No"])
+    assert new.value == 1
+    assert any("'Ye'" in n for n in new.notes)
+
+
+@pytest.mark.parametrize("answer", ["Since 2019", "Simple", "Nothing to add", "-", "C d"])
+def test_words_that_merely_start_alike_are_still_unreadable(tmp_path, answer):
+    new, _ = count(tmp_path, ["Yes", answer], name=f"{abs(hash(answer))}.docx")
+    assert new.is_unparsed, answer

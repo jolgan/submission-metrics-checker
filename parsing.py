@@ -177,16 +177,21 @@ RE_CLIENT_HEADER_ROW = re.compile(
 # New-client answers. Firms qualify them freely - "Yes (for this work type)",
 # "No (existing client)" - so the answer is read by its leading word. The bare
 # forms are kept separately so a qualified answer can be reported as such.
-RE_AFFIRMATIVE = re.compile(r"^y(es)?\b", re.I)
-RE_NEGATIVE = re.compile(r"^n(o)?\b", re.I)
+#
+# Latin American firms answer in their own language: "Sí" or "Si" (Spanish)
+# and "Sim" (Portuguese) for yes, "Não" (Portuguese) for no; Spanish "No" is
+# already no. "Ye" is a typed slip of "Yes"; not being a bare answer, it is
+# named in the note like any qualified one.
+RE_AFFIRMATIVE = re.compile(r"^(y(es?)?|s[ií]m?)\b", re.I)
+RE_NEGATIVE = re.compile(r"^(no?|n[aã]o)\b", re.I)
 RE_NEW_WORD = re.compile(r"^new\b", re.I)
 RE_EXISTING_WORD = re.compile(r"^existing\b", re.I)
 
 # "N/A" starts with an N but does not mean "no" - it means nobody answered.
 RE_NOT_APPLICABLE = re.compile(r"^n\s*/\s*a\b|^n\.?a\.?$|^not applicable\b", re.I)
 
-RE_BARE_AFFIRMATIVE = re.compile(r"^y(es)?$", re.I)
-RE_BARE_NEGATIVE = re.compile(r"^n(o)?$", re.I)
+RE_BARE_AFFIRMATIVE = re.compile(r"^(y(es)?|s[ií]m?)$", re.I)
+RE_BARE_NEGATIVE = re.compile(r"^(no?|n[aã]o)$", re.I)
 RE_BARE_NEW = re.compile(r"^new$", re.I)
 RE_BARE_EXISTING = re.compile(r"^existing$", re.I)
 
@@ -527,7 +532,7 @@ def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
         for row in table.rows[1:]:
             cells = row_text(row)
             name = cells[0] if cells else ""
-            answer = cells[1] if len(cells) > 1 else ""
+            answer = unwrap(cells[1] if len(cells) > 1 else "")
 
             if not name:
                 continue
@@ -603,6 +608,19 @@ def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
         )
     return active, new
 
+
+WRAPPERS = {"[": "]", "(": ")", "{": "}", '"': '"', "'": "'", "\u201c": "\u201d"}
+
+
+def unwrap(answer: str) -> str:
+    """An answer without brackets or quotes wrapped around the whole of it.
+
+    "[No]" is "No". "Yes (for this work type)" keeps its closing bracket,
+    because the brackets do not enclose the whole answer.
+    """
+    while len(answer) >= 2 and WRAPPERS.get(answer[0]) == answer[-1]:
+        answer = answer[1:-1].strip()
+    return answer
 
 def carries_label(table: Table) -> bool:
     """True if a table is introduced by a label the parser recognises."""
