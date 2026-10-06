@@ -818,26 +818,12 @@ with table_col:
         st.session_state["corrections"] = {}
         st.rerun()
 
-# The table and the pasted order hold different things - one row per counted
-# document against every row on the page - so they cannot line up by position.
-# Picking a row here points at its line in the list instead. The editable table
-# above offers no row-selection event, so the link is made by this control.
-selected_row = None
-
+# The pasted page as a checklist beside the table. With the row order set to
+# the pasted page (the default once one is pasted) the two run in the same
+# order, so they can be read side by side.
 if page_col is not None:
     with page_col:
         st.markdown("**Pasted order from Staff Portal**")
-
-        labels = {"(none)": None}
-        for row in table_results:
-            labels[f"{row.practice_area or row.filename}"] = row
-        picked = st.selectbox(
-            "Point at a row",
-            list(labels),
-            index=0,
-            help="Choose a row from the table to mark its line in the list below.",
-        )
-        selected_row = labels[picked]
 
         in_table = {id(r) for r in table_results}
         only_in_table = st.checkbox(
@@ -852,21 +838,7 @@ if page_col is not None:
             else report.rows
         )
 
-        highlighted = None
-        if selected_row is not None:
-            highlighted = next(
-                (r for r in report.rows if r.uploaded is selected_row), None
-            )
-
-        if highlighted is not None:
-            st.caption(f"Table row selected — line {highlighted.position}, marked ▶.")
-        elif selected_row is not None:
-            st.caption("The selected table row is not on the pasted page.")
-        else:
-            st.caption(
-                f"{len(shown_rows)} of {report.page_size} pasted row(s), in your "
-                "order. Click a row in the table to point at its line here."
-            )
+        st.caption(f"{len(shown_rows)} of {report.page_size} pasted row(s), in your order.")
 
         with st.container(height=max(table_height - 24, 200)):
             lines = []
@@ -875,12 +847,8 @@ if page_col is not None:
                 label = page_row.value
                 if len(label) > 40:
                     label = label[:39] + "…"
-                pointer = "▶" if page_row is highlighted else "&nbsp;"
-                if page_row is highlighted:
-                    emphasis = "**"
                 lines.append(
-                    f"{pointer} `{page_row.position:>3}` {marker} "
-                    f"{emphasis}{label}{emphasis}"
+                    f"`{page_row.position:>3}` {marker} {emphasis}{label}{emphasis}"
                 )
             st.markdown("  \n".join(lines))
 

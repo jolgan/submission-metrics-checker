@@ -4,6 +4,8 @@ Drives the real app through Streamlit's AppTest harness with the synthetic
 samples, so a change that breaks the page - not just the counting - fails here.
 """
 
+import re
+
 import pytest
 
 from conftest import DETAILS, EXPECTED, OLDER_VERSION, PORTAL, POWERBI, ROOT, SAMPLES
@@ -375,7 +377,7 @@ def test_show_only_rows_in_the_table_matches_the_table_row_count():
     box.set_value(True).run()
     assert not at.exception
 
-    checklist = next(m.value for m in at.markdown if "&nbsp;" in m.value)
+    checklist = next(m.value for m in at.markdown if re.match(r"^`\s*\d+`", m.value))
     assert checklist.count("✅") == rows_in_table
     assert "⛓️‍💥" not in checklist
 
