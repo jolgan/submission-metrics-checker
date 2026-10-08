@@ -504,3 +504,57 @@ def test_the_heading_is_discreet():
     assert not at.title, "st.title is fixed at a size that dominates the page"
     heading = next(m.value for m in at.markdown if "Submission recount" in m.value)
     assert "opacity" in heading and "font-size" in heading
+
+
+# --- starting a new batch ---------------------------------------------------
+
+
+def _restart_button(at):
+    return next(b for b in at.get("button") if b.label == "↺")
+
+
+def test_the_restart_button_is_there_before_any_files():
+    """It has to be reachable on the empty page, which stops early."""
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
+    assert not at.exception
+    assert _restart_button(at)
+
+
+def test_the_restart_button_asks_first():
+    """Clicking it must confirm, not wipe the batch outright."""
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300).run()
+    _load(at)
+    before = at.session_state["batch_id"]
+    _restart_button(at).click().run()
+    assert not at.exception
+    assert at.session_state["batch_id"] == before
+    assert any(b.label == "Start a new batch" for b in at.get("button"))
+
+
+def test_confirming_clears_the_batch():
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300).run()
+    _load(at)
+    at.session_state["corrections"] = {("x.docx", "matters"): 3}
+    at.session_state["checked_rows"] = {"x.docx"}
+    at.run()
+
+    _restart_button(at).click().run()
+    next(b for b in at.get("button") if b.label == "Start a new batch").click().run()
+
+    assert not at.exception
+    assert at.session_state["batch_id"] == 1
+    assert not at.session_state.get("corrections")
+    assert not at.session_state.get("checked_rows")
+    # Back to the empty page, asking for files again.
+    assert any("Add at least one submission document" in i.value for i in at.get("info"))
+
+
+def test_cancelling_keeps_the_batch():
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300).run()
+    _load(at)
+    _restart_button(at).click().run()
+    next(b for b in at.get("button") if b.label == "Cancel").click().run()
+
+    assert not at.exception
+    assert at.session_state["batch_id"] == 0
+    assert not any("Add at least one submission document" in i.value for i in at.get("info"))

@@ -157,17 +157,65 @@ def _arithmetic(results, table_results, duplicates, superseded, report) -> str:
 # --- inputs -----------------------------------------------------------------
 
 # A quiet heading: the table is what matters on this page, not the name of the
+# --- starting over ----------------------------------------------------------
+
+# Every input widget is keyed to this number. Bumping it hands Streamlit a set
+# of widgets it has never seen, which is the only way to empty a file uploader
+# from code: there is no clear() on the widget itself.
+batch = st.session_state.setdefault("batch_id", 0)
+
+
+def _start_new_batch() -> None:
+    """Drop everything belonging to the batch on screen."""
+    for key in [k for k in st.session_state if k != "batch_id"]:
+        del st.session_state[key]
+    st.session_state["batch_id"] = batch + 1
+
+
+@st.dialog("Start a new batch?")
+def _confirm_new_batch() -> None:
+    st.write(
+        "This clears the documents you have added, both exports, the pasted "
+        "Staff Portal order, and every figure you have typed in or ticked off."
+    )
+    st.caption(
+        "Nothing is kept between batches, so download the results first if you "
+        "still need them."
+    )
+    confirm, cancel = st.columns(2)
+    if confirm.button("Start a new batch", type="primary", width="stretch"):
+        _start_new_batch()
+        st.rerun()
+    if cancel.button("Cancel", width="stretch"):
+        st.session_state.pop("confirming_new_batch", None)
+        st.rerun()
+
+
 # tool. Sized and dimmed by hand because st.title is fixed at a size that
 # dominates everything under it.
-st.markdown(
-    """
-    <div style="font-size:1.15rem; font-weight:600; opacity:0.55;
-                letter-spacing:0.01em; margin:0 0 0.15rem 0;">
-      Submission recount
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+heading, restart = st.columns([12, 1])
+with heading:
+    st.markdown(
+        """
+        <div style="font-size:1.15rem; font-weight:600; opacity:0.55;
+                    letter-spacing:0.01em; margin:0 0 0.15rem 0;">
+          Submission recount
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with restart:
+    if st.button(
+        "↺",
+        help="Start a new batch - clears everything on screen",
+        width="stretch",
+    ):
+        st.session_state["confirming_new_batch"] = True
+# Held open by a flag of its own. A dialog opened straight from the button
+# closes again on the next rerun - which is the rerun its own buttons cause -
+# so the confirmation would never be read.
+if st.session_state.get("confirming_new_batch"):
+    _confirm_new_batch()
 st.caption(
     "Recounts the metrics in submission documents and compares them against the "
     "Power BI export. Everything runs on your machine (offline) for data privacy."
@@ -179,6 +227,7 @@ with left:
         "Submission documents (.docx)",
         type=["docx"],
         accept_multiple_files=True,
+        key=f"docs_{batch}",
         help="Drag in as many as you like. A full firm of ~114 documents takes "
         "about 15 seconds, and uploading the lot each time keeps one downloaded results file "
         "covering everything you have downloaded so far.",
@@ -194,10 +243,13 @@ with left:
         "batch — nothing is saved between runs."
     )
 with right:
-    powerbi_file = st.file_uploader("Power BI export (.xlsx)", type=["xlsx"])
+    powerbi_file = st.file_uploader(
+        "Power BI export (.xlsx)", type=["xlsx"], key=f"powerbi_{batch}"
+    )
     portal_file = st.file_uploader(
         "Staff Portal export - optional (.xlsx or .csv)",
         type=["xlsx", "csv"],
+        key=f"portal_{batch}",
         help=(
             "This helps with populating the file name column - nothing else can "
             "supply it, since the Power BI export does not hold document file "
@@ -245,6 +297,7 @@ with st.expander("Staff Portal row order (optional)", expanded=False):
         height=160,
         placeholder="Professional negligence\nPensions\nProperty finance\n...",
         label_visibility="collapsed",
+        key=f"order_{batch}",
     )
 
     if order_text.strip():
@@ -736,7 +789,7 @@ with table_col:
             width="stretch",
             hide_index=True,
             height=table_height,
-            key="results_table",
+            key=f"results_table_{batch}",
             disabled=[c for c in frame.columns if c not in editable],
             column_config={
                 **{
