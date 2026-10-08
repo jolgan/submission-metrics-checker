@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Submission recount</title>
+
+    <!--
+      The same app, run inside the browser instead of from a terminal.
+
+      stlite compiles Python to WebAssembly, so app.py and the modules it
+      imports are fetched as plain files and run on the viewer's own machine.
+      No submission document is uploaded anywhere: there is no server here to
+      upload one to, only a static page. That is the whole reason this version
+      exists - a hosted Streamlit app would mean confidential client documents
+      passing through somebody else's server.
+
+      The Python files are referenced by URL rather than pasted in below, so
+      this page and the terminal version always run exactly the same code.
+    -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@stlite/browser@1.8.1/build/stlite.css"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #1a1a1a;
+        --dim: #6b6b6b;
+        --page: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e8e8e8;
+          --dim: #9a9a9a;
+          --page: #0e1117;
+        }
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--page);
+      }
+      #root {
+        min-height: 100vh;
+      }
+      /* Shown until stlite replaces the contents of #root. */
+      #booting {
+        font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        color: var(--ink);
+        max-width: 34rem;
+        margin: 0 auto;
+        padding: 4rem 1rem 0;
+        line-height: 1.5;
+      }
+      #booting h1 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        opacity: 0.55;
+        letter-spacing: 0.01em;
+        margin: 0 0 0.75rem;
+      }
+      #booting p {
+        color: var(--dim);
+        font-size: 0.95rem;
+        margin: 0 0 0.75rem;
+      }
+      .bar {
+        height: 3px;
+        background: color-mix(in srgb, var(--dim) 25%, transparent);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 1.25rem;
+      }
+      .bar::after {
+        content: "";
+        display: block;
+        height: 100%;
+        width: 35%;
+        background: var(--dim);
+        border-radius: 2px;
+        animation: slide 1.4s ease-in-out infinite;
+      }
+      @keyframes slide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(340%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar::after {
+          animation: none;
+          width: 100%;
+          opacity: 0.4;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="booting">
+        <h1>Submission recount</h1>
+        <p>
+          Starting up. The first visit downloads Python and the libraries into
+          your browser, which takes about half a minute on a normal connection.
+          After that it is cached and opens quickly.
+        </p>
+        <p>
+          Everything runs on your own machine. Documents you add are read in
+          this tab and are never uploaded.
+        </p>
+        <div class="bar"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@1.8.1/build/stlite.js";
+
+      // Fetched from this same site, so the browser version can never drift
+      // from the one run in a terminal.
+      const sources = [
+        "app.py",
+        "parsing.py",
+        "matching.py",
+        "export_writer.py",
+        "docx_repair.py",
+      ];
+
+      const files = Object.fromEntries(
+        sources.map((name) => [name, { url: `./${name}` }]),
+      );
+
+      mount(
+        {
+          entrypoint: "app.py",
+          files,
+          // streamlit and pandas come with stlite; lxml is resolved for
+          // python-docx from Pyodide's own builds. Versions are deliberately
+          // unpinned: requirements.txt pins what CPython installs, but the
+          // browser can only have what has been built for it.
+          requirements: ["python-docx", "openpyxl"],
+          streamlitConfig: {
+            "browser.gatherUsageStats": false,
+            "client.toolbarMode": "minimal",
+          },
+        },
+        document.getElementById("root"),
+      );
+    </script>
+  </body>
+</html>
