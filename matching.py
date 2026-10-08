@@ -1460,7 +1460,11 @@ def review_note(
             found = row.document.metrics.get(metric)
             why = "numbering does not add up"
             if found and found.needs_check:
-                why = "a nomination nobody could classify"
+                why = (
+                    "a row may not be a client"
+                    if metric == "active_clients"
+                    else "a nomination nobody could classify"
+                )
             parts.append(f"{name}: {why}")
     return "; ".join(parts)
 

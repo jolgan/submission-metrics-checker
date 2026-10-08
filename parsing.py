@@ -545,8 +545,15 @@ def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
         msg = "No 'Active key clients' table found - could not locate the client section."
         return Metric(value=None, notes=[msg]), Metric(value=None, notes=[msg])
 
+    suspicious: list[str] = []
     for table in client_tables:
         rows_counted = 0
+        # A row left blank in a column the firm has otherwise filled in is the
+        # shape a heading takes: "ISSUERS", "Initial Purchasers", "All clients
+        # are confidential". Judged per table, because some firms leave the
+        # whole column empty - that is a habit, not a heading.
+        table_blanks: list[str] = []
+        table_answered = 0
         for row in table.rows[1:]:
             cells = row_text(row)
             name = cells[0] if cells else ""
@@ -590,8 +597,17 @@ def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
                     qualified.append(answer)
             elif answer == "":
                 blanks += 1
+                table_blanks.append(name)
             else:
                 unrecognised.append(answer)
+
+            if answer != "":
+                table_answered += 1
+
+        # Either the odd row out, or a lone row that answers nothing - which is
+        # how a firm writes "All clients are confidential" in place of a list.
+        if table_blanks and (table_answered or rows_counted == len(table_blanks) == 1):
+            suspicious.extend(table_blanks)
 
         active.evidence.append(f"{table_label(table)} table - {rows_counted} client rows")
 
@@ -604,6 +620,16 @@ def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
         )
     if blanks:
         new.notes.append(f"{blanks} blank answer(s) counted as not-new.")
+    if suspicious:
+        # Counted, not dropped: a real client whose answer was missed would
+        # otherwise vanish silently. Flagged so the figure is checked by eye.
+        listed = ", ".join(repr(s) for s in suspicious[:6])
+        more = f" and {len(suspicious) - 6} more" if len(suspicious) > 6 else ""
+        active.needs_check = True
+        active.notes.append(
+            f"{len(suspicious)} row(s) with no new-client answer where others "
+            f"have one: {listed}{more}. Counted - check they are clients."
+        )
     if not_applicable:
         active.notes.append(
             f"{not_applicable} row(s) read 'N/A' in the client column and were not "

@@ -385,9 +385,15 @@ def test_the_review_note_carries_the_baseline_for_an_uncounted_cell(results):
 
 
 def test_a_settled_row_has_an_empty_review_note(results):
+    """Beta is the sample with nothing outstanding.
+
+    Alpha leaves one client's new-client answer blank where the rest of its
+    table is filled in, which is now flagged, so it is no longer the settled
+    one.
+    """
     from matching import review_note
 
-    row = next(r for r in results if "alpha" in r.filename)
+    row = next(r for r in results if "beta" in r.filename)
     assert review_note(row, {}) == ""
 
 
