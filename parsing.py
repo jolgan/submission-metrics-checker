@@ -100,7 +100,10 @@ RE_NOMINATION_LABEL = re.compile(
     # associates section: "Note that this section can include counsel."
     # The box number sits after the descriptor ("Partner: leading individual 1")
     # or between the role and the colon ("Partner 1: leading individual").
-    r"^(?P<role>partner|associate|counsel)\s*\d*\s*[:\u2013\u2014-]\s*(?P<descriptor>\S.*)$",
+    # The role is written plural by some firms ("Associates: leading associate 1"),
+    # which is the section heading's wording carried onto every box.
+    r"^(?P<role>partners?|associates?|counsels?)\s*\d*\s*"
+    r"[:\u2013\u2014-]\s*(?P<descriptor>\S.*)$",
     re.I,
 )
 
@@ -113,6 +116,12 @@ RE_BARE_LEAD_PARTNER = re.compile(
 )
 RE_BARE_ASSOCIATE = re.compile(
     r"^(rising\s+stars?|leading\s+(associates?|counsels?))\s*\d*$", re.I
+)
+# What a nomination description looks like, used only to tell a plural-role
+# nomination box from a summary row that happens to share its shape.
+RE_NOMINATION_DESCRIPTOR = re.compile(
+    r"leading|senior|individual|next\s*gen|rising\s+star|counsel|associate|partner",
+    re.I,
 )
 RE_NEXT_GEN_WORDS = re.compile(r"next\s*gen(eration)?", re.I)
 RE_LEADING_WORDS = re.compile(r"leading|rising\s+star|individual|senior", re.I)
@@ -151,9 +160,18 @@ def classify_nomination(label: str) -> str | None:
         if RE_BARE_LEAD_PARTNER.match(label):
             return "lead_partners"
         return None
-    if match.group("role").lower() in {"associate", "counsel"}:
-        return "associates"
     descriptor = match.group("descriptor")
+    role_text = match.group("role").lower()
+    # Singular or plural, it is the same role. The plural is the unusual form
+    # and also how a summary row reads ("Partners: two"), so it is accepted
+    # only where the description names a nomination outright. The singular is
+    # the established shape of a nomination box and is still taken on trust,
+    # so an invented description is reported rather than dropped.
+    if role_text.endswith("s") and not RE_NOMINATION_DESCRIPTOR.search(descriptor):
+        return None
+    role = role_text.rstrip("s")
+    if role in {"associate", "counsel"}:
+        return "associates"
     if RE_NEXT_GEN_WORDS.search(descriptor):
         return "next_gen"
     if RE_LEADING_WORDS.search(descriptor):

@@ -292,3 +292,60 @@ def test_a_number_between_the_role_and_the_colon(label, category):
 def test_a_plural_role_is_not_a_nomination_label():
     """"Number of PARTNERS in the team" heads a table of its own."""
     assert classify_nomination("Number of PARTNERS in the team") is None
+
+
+# --- the role written plural ------------------------------------------------
+
+
+@pytest.mark.parametrize("label,category", [
+    ("Associates: leading associate 1", "associates"),
+    ("Associates: leading associate 5", "associates"),
+    ("Counsels: leading counsel 1", "associates"),
+    ("Partners: leading partner 2", "lead_partners"),
+    ("Partners: next generation 2", "next_gen"),
+])
+def test_a_plural_role_is_the_same_role(label, category):
+    """One firm carries the section heading's plural onto every box.
+
+    "Associates: leading associate 1" matched no label at all, so five
+    nominations were dropped and the category reported as uncountable.
+    """
+    assert classify_nomination(label) == category
+
+
+def test_a_plural_associate_is_not_filed_as_a_partner():
+    """The guard on the fix above.
+
+    Allowing the plural without also reading it as the same role left
+    "Associates:" falling through to the partner branch, where "leading" in
+    the description made it a leading partner - turning five dropped
+    associates into five invented partners, which is worse than counting none.
+    """
+    for label in ("Associates: leading associate 1", "Counsels: leading counsel 1"):
+        assert classify_nomination(label) != "lead_partners"
+
+
+def test_a_plural_role_without_a_colon_is_not_a_label():
+    for label in ("Number of PARTNERS in the team", "Partners in the team"):
+        assert classify_nomination(label) is None
+
+
+def test_the_reported_plural_document_shape(tmp_path):
+    metrics = submission(tmp_path, [
+        "Partner: leading partner 1",
+        "Associates: leading associate 1",
+        "Associates: leading associate 2",
+    ])
+    assert metrics["associates"].value == 2
+    assert metrics["lead_partners"].value == 1
+
+
+def test_a_plural_role_with_no_nomination_description_is_not_a_label():
+    """"Partners: two" is a summary row that happens to share the shape."""
+    assert classify_nomination("Partners: two") is None
+    assert classify_nomination("Associates: 14") is None
+
+
+def test_a_singular_role_with_an_invented_description_is_still_reported():
+    """The looser reading stays on the singular form, so nothing is dropped."""
+    assert classify_nomination("Partner: star performer 1") == UNCLASSIFIED
