@@ -98,40 +98,69 @@ and which files are duplicates of one already read.
 
 ## Install and run
 
-You need Python 3.12 or newer, and git.
+You need **Python 3.12 or newer** and **git** installed first.
+
+To check, open a terminal and type `python --version`. If it says "Python was
+not found" or opens the Microsoft Store, install Python from
+<https://www.python.org/downloads/> and tick **"Add Python to PATH"** on the
+first screen of the installer.
 
 ### Where the commands go
 
-Type the commands below into a **terminal**, one line at a time, pressing
-Enter after each. Any of these works:
-
-- **VS Code:** open the built-in terminal with **Terminal > New Terminal**.
-- **Windows with WSL:** the Ubuntu app.
-- **Windows without WSL:** PowerShell. Use the activate line shown in the
-  comment on the right.
+- **Windows:** PowerShell (press Start, type `powershell`).
 - **macOS or Linux:** the Terminal app.
+- **Windows with WSL:** the Ubuntu app, and follow the macOS/Linux commands.
 
-A terminal starts in your home folder, so the `cd` line moves it into the
-project folder. Every later command must be run from there.
+Pick the block for your system below and **paste the whole block in one go**.
+Your terminal will run each line as it arrives. The two blocks are not
+interchangeable: the commands genuinely differ between Windows and the rest.
 
 ### First time: download and set up
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/jolgan/submission-metrics-checker.git
+cd submission-metrics-checker
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python tools/make_synthetic_samples.py
+```
+
+**macOS, Linux or WSL:**
 
 ```bash
 git clone https://github.com/jolgan/submission-metrics-checker.git
 cd submission-metrics-checker
 python3 -m venv .venv
-source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 python tools/make_synthetic_samples.py
 ```
 
-On Windows, type `python` where it says `python3`.
+You only do this once. If the Windows activate line is refused because
+scripts are disabled, run this and then try the block again:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
 
 ### Every time: start the app
 
+**Windows (PowerShell):**
+
+```powershell
+cd submission-metrics-checker
+.venv\Scripts\Activate.ps1
+streamlit run app.py
+```
+
+**macOS, Linux or WSL:**
+
 ```bash
 cd submission-metrics-checker
-source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\activate
+source .venv/bin/activate
 streamlit run app.py
 ```
 
@@ -139,12 +168,41 @@ Then open <http://127.0.0.1:8501> in your browser. Drag in submission
 documents, the Power BI export, and optionally the Staff Portal export.
 
 The app runs for as long as that terminal stays open. To **stop** it, click
-into the terminal and press **Ctrl+C**. To **restart** it, stop it and run
-`streamlit run app.py` again.
+into the terminal and press **Ctrl+C**. If you close the terminal window the
+app stops with it, which is the usual reason it disappears.
 
 Restart it, not just refresh the browser, after changes to `parsing.py`,
 `matching.py` or `export_writer.py`. Streamlit keeps imported modules in memory
 for as long as it runs.
+
+### If something goes wrong
+
+**"Python was not found"** - Python is not installed, or was installed without
+"Add Python to PATH". Reinstall from python.org and tick that box.
+
+**"The term 'source' is not recognized"** - that is the macOS/Linux line. Use
+the Windows block.
+
+**"running scripts is disabled on this system"** - run the
+`Set-ExecutionPolicy` line above, then activate again.
+
+**Packages install but the app will not start** - the virtual environment was
+probably not active. The terminal prompt shows `(.venv)` at the start of the
+line when it is. Run the activate line for your system and try again.
+
+**"Port 8501 is already in use"** - the app is already running in another
+terminal. Open <http://127.0.0.1:8501>, or start this one on a different port
+with `streamlit run app.py --server.port 8502`.
+
+### No installing at all
+
+There is a browser version that needs none of the above:
+
+<https://www.jolenegan.com/submission-metrics-checker/>
+
+It runs the same code inside the browser, so documents stay on your machine.
+It is roughly five times slower than running it locally, so it suits small
+batches and demonstrations rather than a full firm.
 
 ## Project structure
 
