@@ -1076,6 +1076,26 @@ def nomination_segments(table: Table) -> list[tuple[str, str, int, int]]:
     ]
 
 
+# The headings a matter box puts above the people who worked on it. Word
+# splits a long matter across two tables, and the half holding the team then
+# carries no matter label of its own, so the label alone cannot say whether a
+# row is a nomination or a credit on a matter.
+RE_MATTER_TEAM = re.compile(
+    r"^(lead partners?|lead partner\(s\)|other key team members"
+    r"|other team members)\s*$",
+    re.I,
+)
+
+
+def has_matter_team(table: Table) -> bool:
+    """Whether a table holds a matter's list of who worked on it."""
+    for row in table.rows:
+        cells = row_text(row)
+        if cells and RE_MATTER_TEAM.match(cells[0]):
+            return True
+    return False
+
+
 def count_nominations(
     tables: list[Table], paragraphs: list[str], key: str
 ) -> Metric:
@@ -1094,7 +1114,7 @@ def count_nominations(
     adopted: set[int] = set()
     for index, table in enumerate(tables):
         segments = nomination_segments(table)
-        if segments and label_rows(table, RE_MATTER_TABLE):
+        if segments and (label_rows(table, RE_MATTER_TABLE) or has_matter_team(table)):
             # A matter box lists the team that worked on it, and firms write
             # the role into the name cell: "Associate: Lucia Lagana", under a
             # Name/Office/Practice area header. Read as nomination labels those

@@ -109,3 +109,70 @@ def test_a_barrister_credited_on_a_matter_is_not_an_associate(tmp_path):
         "Counsel: Brian Nicholson KC and Kyra Nezami, both of 11 South Square",
     ])
     assert metrics["associates"].value == 1
+
+
+# --- a team block Word has split off its matter ----------------------------
+
+
+def split_team(tmp_path, team_rows):
+    """A matter whose team block ends up in a table of its own.
+
+    Word splits a long matter across two tables. The half holding the team
+    then carries no matter label, so the label alone cannot say whether a row
+    is a nomination or a credit on a matter.
+    """
+    document = Document()
+    document.add_paragraph("Firm Name")
+    document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
+
+    document.add_paragraph("Clients: publishable clients")
+    clients = document.add_table(rows=2, cols=2)
+    clients.rows[0].cells[0].text = "Active key clients (over the last 12 months)"
+    clients.rows[0].cells[1].text = "New client (yes/no)"
+    clients.rows[1].cells[0].text = "A Client Ltd"
+    clients.rows[1].cells[1].text = "Yes"
+
+    document.add_paragraph("Your team - Associates: leading associates")
+    box = document.add_table(rows=3, cols=2)
+    box.rows[0].cells[0].text = "Associate: leading associate 1"
+    box.rows[1].cells[0].text = "Name"
+    box.rows[1].cells[1].text = "Location"
+    box.rows[2].cells[0].text = "Lucia Lagana"
+
+    matter = document.add_table(rows=3, cols=2)
+    matter.rows[0].cells[0].text = "Publishable matter 1"
+    matter.rows[1].cells[0].text = "Name of client"
+    matter.rows[2].cells[0].text = "A Client Ltd"
+
+    # The split half: no matter label, only the team heading.
+    tail = document.add_table(rows=3 + len(team_rows), cols=3)
+    tail.rows[0].cells[0].text = "Adrian Villagomez Aleman"
+    tail.rows[1].cells[0].text = "Other key team members"
+    tail.rows[2].cells[0].text = "Name"
+    tail.rows[2].cells[1].text = "Office"
+    tail.rows[2].cells[2].text = "Practice area"
+    for index, name in enumerate(team_rows, start=3):
+        tail.rows[index].cells[0].text = name
+        tail.rows[index].cells[1].text = "Mexico City"
+
+    path = tmp_path / "split.docx"
+    document.save(path)
+    return parse_document(path).metrics
+
+
+def test_a_team_block_without_its_matter_label_is_still_a_team(tmp_path):
+    """The reported shape: ten leading associates counted as eleven."""
+    metrics = split_team(tmp_path, ["Associate: Santiago Hernandez Gutierrez"])
+    assert metrics["associates"].value == 1
+
+
+def test_lead_partners_heading_has_the_same_effect(tmp_path):
+    metrics = split_team(tmp_path, ["Partner: Adrian Villagomez"])
+    assert metrics["lead_partners"].value == 0
+
+
+def test_the_nomination_box_beside_it_still_counts(tmp_path):
+    metrics = split_team(tmp_path, ["Associate: Santiago Hernandez Gutierrez"])
+    assert metrics["associates"].evidence == [
+        "Associate: leading associate 1 - Lucia Lagana"
+    ]
