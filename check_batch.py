@@ -36,6 +36,25 @@ def basename(uri: str) -> str:
     return unquote(str(uri).split("?")[0].replace("\\", "/").rsplit("/", 1)[-1]).strip()
 
 
+def created_at(row: dict) -> str:
+    """The portal's Created At, as a string that sorts chronologically.
+
+    Dates arrive as text or as a datetime depending on whether the export was
+    saved as .csv or .xlsx. A row with no date sorts oldest, so it never wins a
+    comparison and never silently sets another row aside.
+    """
+    value = row.get("Created At") or row.get("Created at") or row.get("created_at")
+    if value is None or str(value).strip() == "":
+        return ""
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    text = str(value).strip()
+    match = re.match(r"(\d{2})/(\d{2})/(\d{4})", text)  # dd/mm/yyyy
+    if match:
+        return f"{match.group(3)}-{match.group(2)}-{match.group(1)}"
+    return text
+
+
 def table_code(name: str) -> tuple[str, str] | None:
     """(firm reference, EC table code) from a submission file name."""
     match = re.search(r"_(\d+)_submission_.*_(EC\d+)\.docx$", name, re.I)
@@ -66,12 +85,42 @@ def portal_rows(path: Path) -> list[dict]:
     return []
 
 
+# Downloads are filed one folder per firm, but those are often grouped by
+# country ("Downloads/mexico/Sainz Abogados"), so a firm is looked for a level
+# or two down rather than only at the top.
+FOLDER_DEPTH = 3
+
+
 def find_folders() -> list[Path]:
-    out = []
+    out: list[Path] = []
     for root in DOWNLOADS:
-        if root.is_dir():
-            out += [p for p in sorted(root.iterdir())
+        if not root.is_dir():
+            continue
+        for depth in range(1, FOLDER_DEPTH + 1):
+            out += [p for p in sorted(root.glob("/".join(["*"] * depth)))
                     if p.is_dir() and any(p.glob("*.docx"))]
+    return out
+
+
+def folder_label(folder: Path) -> str:
+    """The folder's name, with its parent when that is what tells firms apart."""
+    for root in DOWNLOADS:
+        try:
+            relative = folder.relative_to(root)
+        except ValueError:
+            continue
+        return str(relative)
+    return folder.name
+
+
+def nearby_portals(folder: Path) -> list[Path]:
+    """Portal exports filed with the documents themselves."""
+    out: list[Path] = []
+    for place in (folder / "spreadsheets", folder, folder.parent / "spreadsheets"):
+        if place.is_dir():
+            out += sorted(p for p in place.iterdir()
+                          if p.suffix.lower() in (".csv", ".xlsx")
+                          and not p.name.startswith("~$"))
     return out
 
 
@@ -86,8 +135,12 @@ def find_portals() -> list[Path]:
 
 def pick_folder(firm: str) -> Path | None:
     wanted = firm.lower().replace(" ", "")
-    for folder in find_folders():
+    folders = find_folders()
+    for folder in folders:  # the firm's own folder name first
         if wanted in folder.name.lower().replace(" ", ""):
+            return folder
+    for folder in folders:  # then anywhere in the path, so "mexico" works too
+        if wanted in folder_label(folder).lower().replace(" ", ""):
             return folder
     return None
 
@@ -99,14 +152,14 @@ def main() -> int:
     parser.add_argument("--portal", help="the Staff Portal export to check against")
     args = parser.parse_args()
 
-    if not args.firm:
+    if not args.firm and not args.folder:
         print("Give a firm name, for example:\n")
         print('    .venv/bin/python check_batch.py "Example Firm"\n')
         folders = find_folders()
         if folders:
             print("Folders with documents in them:")
             for folder in folders:
-                print(f"    {folder.name}   ({len(list(folder.glob('*.docx')))} files)")
+                print(f"    {folder_label(folder)}   ({len(list(folder.glob('*.docx')))} files)")
         return 1
 
     folder = Path(args.folder) if args.folder else pick_folder(args.firm)
@@ -114,13 +167,24 @@ def main() -> int:
         print(f"No downloads folder found for {args.firm!r}.")
         print("Folders I can see:")
         for candidate in find_folders():
-            print(f"    {candidate.name}")
+            print(f"    {folder_label(candidate)}")
         print("\nOr point at it directly with --folder \"/path/to/folder\"")
         return 1
 
+    # With --folder and no name, the folder is named after the firm.
+    if not args.firm:
+        args.firm = folder.name
+
     on_disk = {p.name.lower(): p.name for p in folder.glob("*.docx")}
 
-    portals = [Path(args.portal)] if args.portal else find_portals()
+    # The firm's own export is the one to trust. A publication-wide export
+    # kept in samples/ often covers the firm too, which makes the right answer
+    # arrive for the wrong reason - and the wrong answer, silently, when it
+    # does not cover them.
+    portals = (
+        [Path(args.portal)] if args.portal
+        else nearby_portals(folder) + find_portals()
+    )
     rows, used = [], None
     for candidate in portals:
         if not candidate.is_file():
@@ -157,6 +221,32 @@ def main() -> int:
         else:
             no_document.append(row)
 
+    # A firm that resubmits leaves both rows on the portal. Only the newer is
+    # counted, so only the newer is worth fetching - listing the older one as
+    # missing sends the checker after a file that would be set aside the moment
+    # it arrived. Decided on Created At; a tie is left alone rather than
+    # guessed at.
+    superseded = {}
+    slots: dict[tuple, list[tuple[str, dict]]] = {}
+    for name, row in wanted.items():
+        key = (
+            str(row.get("Firm Name") or "").strip().lower(),
+            str(row.get("Country") or row.get("Region") or "").strip().lower(),
+            str(row.get("Practice Area Name") or "").strip().lower(),
+        )
+        slots.setdefault(key, []).append((name, row))
+    for entries in slots.values():
+        if len(entries) < 2:
+            continue
+        dated = [(n, r, created_at(r)) for n, r in entries]
+        newest = max(d for _, _, d in dated)
+        if sum(1 for _, _, d in dated if d == newest) > 1:
+            continue
+        for name, row, date in dated:
+            if date != newest:
+                superseded[name] = row
+    wanted = {n: r for n, r in wanted.items() if n not in superseded}
+
     missing = {n: r for n, r in wanted.items() if n.lower() not in on_disk}
     extra = [on_disk[k] for k in on_disk if k not in {n.lower() for n in wanted}]
 
@@ -186,6 +276,13 @@ def main() -> int:
             print(f"        {row.get('Region')} | {row.get('Practice Area Name')}")
     else:
         print("\nNothing missing. Every document the portal lists is in the folder.")
+    if superseded:
+        print(f"\nolder versions, already replaced ({len(superseded)}), "
+              "nothing to download:")
+        for name, row in superseded.items():
+            print(f"    {name}")
+            print(f"        {row.get('Region')} | {row.get('Practice Area Name')}"
+                  f" | {created_at(row)[:10]}")
 
     if elite_files:
         print(f"\n{len(elite_files)} Elite file(s) in the folder - not recounted, "
