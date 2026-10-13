@@ -524,6 +524,12 @@ def split_dropdown(text: str) -> list[str]:
 # --- metric counting --------------------------------------------------------
 
 
+def shorten(text: str, limit: int) -> str:
+    """Text cut to a readable length, so one long row cannot swamp a note."""
+    text = " ".join(str(text).split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "\u2026"
+
+
 def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
     """Count active clients and new active clients across all client tables.
 
@@ -623,12 +629,14 @@ def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
     if suspicious:
         # Counted, not dropped: a real client whose answer was missed would
         # otherwise vanish silently. Flagged so the figure is checked by eye.
-        listed = ", ".join(repr(s) for s in suspicious[:6])
-        more = f" and {len(suspicious) - 6} more" if len(suspicious) > 6 else ""
+        # Quoted short: one of these is a paragraph written to the researcher
+        # where a client name belongs, and the whole of it drowns the note.
+        listed = ", ".join(repr(shorten(s, 44)) for s in suspicious[:4])
+        more = f" and {len(suspicious) - 4} more" if len(suspicious) > 4 else ""
         active.needs_check = True
         active.notes.append(
-            f"{len(suspicious)} row(s) with no new-client answer where others "
-            f"have one: {listed}{more}. Counted - check they are clients."
+            f"{len(suspicious)} row(s) answer nothing in the new-client "
+            f"column: {listed}{more}. Counted - check they are clients."
         )
     if not_applicable:
         active.notes.append(
