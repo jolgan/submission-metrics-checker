@@ -7,7 +7,7 @@ table must too.
 
 import pytest
 
-from conftest import MANIFEST, OLDER_VERSION, PORTAL, POWERBI, SAMPLES
+from conftest import DETAILS, MANIFEST, OLDER_VERSION, PORTAL, POWERBI, SAMPLES
 from matching import (
     build_results,
     collapse_superseded,
@@ -165,3 +165,55 @@ def test_unmatched_rows_are_never_collapsed(exports):
 def test_the_manifest_describes_this_pair():
     assert MANIFEST["superseded"]["older"] == OLDER
     assert MANIFEST["superseded"]["newer"] == NEWER
+
+
+# --- the same thing, on the pasted page ------------------------------------
+
+
+def _page(areas):
+    """A Reconciliation for a pasted page naming these practice areas."""
+    from matching import (
+        build_portal_order,
+        read_pasted_order,
+        reconcile,
+    )
+
+    powerbi, portal = load_powerbi(POWERBI), load_portal(PORTAL)
+    documents = [parse_document(p) for p in SAMPLES.values()]
+    results = collapse_superseded(build_results(documents, powerbi, portal))
+    order = build_portal_order(read_pasted_order("\n".join(areas)))
+    return reconcile(results, portal, order)
+
+
+def test_a_superseded_page_row_is_not_expected():
+    """A row the page lists twice needs one download, not two.
+
+    A firm that resubmits leaves both rows on the page. Every row carrying a
+    document counted towards what the batch still owed, so a firm with seven
+    resubmissions reported seven rows outstanding - and the checker went
+    looking for seven files that would have been set aside on arrival.
+    """
+    area = DETAILS["alpha"]["practice_area"].split(" > ")[1]
+    report = _page([area, area])
+    assert len(report.expected) == 1
+    assert sum(1 for r in report.rows if r.status == "older version") == 1
+
+
+def test_a_superseded_page_row_is_not_missing():
+    area = DETAILS["alpha"]["practice_area"].split(" > ")[1]
+    report = _page([area, area])
+    assert report.missing == []
+    assert report.not_reached == []
+
+
+def test_a_superseded_page_row_is_not_counted_as_covered():
+    """It is not in the batch, so it cannot be part of what the batch covered."""
+    area = DETAILS["alpha"]["practice_area"].split(" > ")[1]
+    report = _page([area, area])
+    assert len(report.accounted) <= len(report.expected)
+
+
+def test_a_single_page_row_is_untouched():
+    area = DETAILS["beta"]["practice_area"].split(" > ")[1]
+    report = _page([area])
+    assert not any(r.superseded for r in report.rows)

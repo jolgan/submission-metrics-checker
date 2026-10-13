@@ -1601,6 +1601,7 @@ class PageRow:
     uploaded: "ResultRow | None" = None
     reached: bool = False  # within the span this batch got down to
     repeat_of: int | None = None  # line whose export row this one repeats
+    superseded: bool = False  # a newer submission covers the same slot
 
     @property
     def has_document(self) -> bool:
@@ -1643,6 +1644,11 @@ class PageRow:
             if self.uploaded.status == "superseded":
                 return "older version"
             return "uploaded"
+        if self.superseded:
+            # A newer submission covers this slot, so there is nothing here to
+            # download. Left as "missing" it sent the checker hunting for files
+            # that would be set aside even if they were found.
+            return "older version"
         if self.repeat_of is not None and self.reached:
             # The export gives this line the same row as an earlier one, so
             # which document it means can only be read off the page itself.
@@ -1672,7 +1678,10 @@ class Reconciliation:
     @property
     def expected(self) -> list[PageRow]:
         """Page rows that do have a submission document to download."""
-        return [r for r in self.rows if r.has_document and not r.is_elite]
+        return [
+            r for r in self.rows
+            if r.has_document and not r.is_elite and not r.superseded
+        ]
 
     @property
     def elite(self) -> list[PageRow]:
@@ -1698,8 +1707,15 @@ class Reconciliation:
 
     @property
     def accounted(self) -> list[PageRow]:
-        """Rows whose document is in the batch, counted or set aside as older."""
-        return [r for r in self.rows if r.status in ("uploaded", "older version")]
+        """Rows whose document is in the batch, counted or set aside as older.
+
+        The upload is what decides it. "Older version" also marks a row the
+        page lists but nobody needs to fetch, and those are not in the batch.
+        """
+        return [
+            r for r in self.rows
+            if r.uploaded is not None and r.status in ("uploaded", "older version")
+        ]
 
     @property
     def distinct_documents(self) -> int:
@@ -1797,6 +1813,47 @@ def describe_record(record: dict) -> str:
     return f"{area} ({region})" if region else area
 
 
+def _mark_superseded_page_rows(report: "Reconciliation") -> None:
+    """Flag page rows whose slot a newer submission already covers.
+
+    A firm that resubmits leaves both rows on the Staff Portal page: the
+    replacement and the one it replaces. Only the newer is counted, so only the
+    newer is worth downloading - but every row carrying a document counted
+    towards what the batch still owed, so a firm with seven resubmissions
+    reported seven rows outstanding that nobody should fetch. One batch sent
+    the checker looking for seven files that would have been set aside on
+    arrival.
+
+    Decided on the portal's Created At, the same evidence collapse_superseded
+    uses for the documents themselves. Rows that cannot be told apart by date
+    are left alone rather than guessed at.
+    """
+    groups: dict[tuple[str, str, str], list["PageRow"]] = {}
+    for page_row in report.rows:
+        if not page_row.has_document or page_row.is_elite or not page_row.records:
+            continue
+        record = page_row.records[0]
+        firm = normalise(record.get("firm"))
+        area = normalise(_portal_practice_area(record))
+        if not firm or not area:
+            continue
+        groups.setdefault((firm, normalise(record.get("region")), area), []).append(
+            page_row
+        )
+
+    for rows in groups.values():
+        if len(rows) < 2:
+            continue
+        dated = [(r, _created_at(r.records[0])) for r in rows]
+        newest = max(date for _, date in dated)
+        if sum(1 for _, date in dated if date == newest) > 1:
+            # A tie cannot say which replaced which, so nothing is set aside.
+            continue
+        for page_row, date in dated:
+            if date != newest:
+                page_row.superseded = True
+
+
 def reconcile(
     results: list[ResultRow], portal: PortalExport, portal_order: PortalOrder
 ) -> Reconciliation:
@@ -1883,6 +1940,8 @@ def reconcile(
         for row in results
         if row.status not in ("duplicate", "elite") and id(row) not in accounted
     ]
+
+    _mark_superseded_page_rows(report)
 
     # Documents are worked top to bottom, so the number of files given is how
     # many downloadable rows this batch covers - no more. An earlier version
