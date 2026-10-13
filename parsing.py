@@ -932,9 +932,18 @@ def count_nominations(
     unclassified: list[str] = []
 
     split = 0
+    in_matters: list[str] = []
     adopted: set[int] = set()
     for index, table in enumerate(tables):
         segments = nomination_segments(table)
+        if segments and label_rows(table, RE_MATTER_TABLE):
+            # A matter box lists the team that worked on it, and firms write
+            # the role into the name cell: "Associate: Lucia Lagana", under a
+            # Name/Office/Practice area header. Read as nomination labels those
+            # turned one leading associate into nine, with nothing to say so.
+            # A nomination box has never shared a table with a matter.
+            in_matters.extend(label for _, label, *_ in segments)
+            continue
         merged += max(len(segments) - 1, 0)
         for category, label, start, end in segments:
             name = nomination_name(table, start, end)
@@ -985,6 +994,12 @@ def count_nominations(
         metric.notes.append("No nominations of this type in the document.")
         return metric
 
+    if in_matters:
+        listed = ", ".join(repr(label) for label in sorted(set(in_matters))[:3])
+        metric.notes.append(
+            f"{len(in_matters)} role label(s) inside matter tables were not "
+            f"counted as nominations: {listed}."
+        )
     if empty:
         metric.notes.append(f"{empty} empty nomination template(s) skipped.")
     if split:
