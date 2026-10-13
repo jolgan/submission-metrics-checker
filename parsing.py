@@ -400,6 +400,7 @@ class ParsedDocument:
     metrics: dict[str, Metric] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
+    chambers: bool = False  # written on a competitor's form, not ours
 
     @property
     def ok(self) -> bool:
@@ -528,6 +529,155 @@ def shorten(text: str, limit: int) -> str:
     """Text cut to a readable length, so one long row cannot swamp a note."""
     text = " ".join(str(text).split())
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "\u2026"
+
+
+# --- a competitor's form ----------------------------------------------------
+
+# A few firms answer on Chambers' submission form instead of ours. It asks for
+# the same things in a different shape, so the figures are there to be had, but
+# nothing about it can be assumed from the Legal 500 template.
+RE_CHAMBERS_SITE = re.compile(r"myaccount\.chambers\.com", re.I)
+RE_CHAMBERS_LAWYERS = re.compile(r"^B9\b.*ranked and unranked lawyers", re.I | re.S)
+RE_CHAMBERS_CLIENTS = re.compile(r"^(D0|E0)\b.*clients", re.I | re.S)
+RE_CHAMBERS_PARTNER_COL = re.compile(r"^partner\s*y\s*/\s*n", re.I)
+RE_CHAMBERS_NAME_COL = re.compile(r"^name of client", re.I)
+RE_CHAMBERS_NEW_COL = re.compile(r"^new client", re.I)
+
+
+def is_chambers_form(tables: list[Table], paragraphs: list[str]) -> bool:
+    """Whether this document is Chambers' form rather than ours.
+
+    Recognised by its own section codes and its upload address, not by what is
+    missing from it: a Legal 500 form that simply failed to parse must not be
+    mistaken for a competitor's.
+    """
+    if any(RE_CHAMBERS_SITE.search(p) for p in paragraphs):
+        return True
+    for table in tables:
+        label = table_label(table)
+        if RE_CHAMBERS_LAWYERS.match(label) or RE_CHAMBERS_CLIENTS.match(label):
+            return True
+    return False
+
+
+def _column_of(row: "Row", pattern: re.Pattern) -> int | None:
+    for index, cell in enumerate(row_text(row)):
+        if pattern.match(cell):
+            return index
+    return None
+
+
+def count_chambers_nominations(tables: list[Table]) -> tuple[Metric, Metric]:
+    """Leading partners and leading associates off the B9 lawyer table.
+
+    Chambers asks for one row per lawyer with a "Partner Y/N" column rather
+    than a box per nomination. Y is a leading partner and N a leading
+    associate, which is the reading Legal 500 applies to these submissions.
+    """
+    partners, associates = Metric(value=0), Metric(value=0)
+    unreadable: list[str] = []
+    found = False
+
+    for table in tables:
+        if not RE_CHAMBERS_LAWYERS.match(table_label(table)):
+            continue
+        column, start = None, 0
+        for index, row in enumerate(table.rows):
+            column = _column_of(row, RE_CHAMBERS_PARTNER_COL)
+            if column is not None:
+                start = index + 1
+                break
+        if column is None:
+            continue
+        found = True
+        for row in table.rows[start:]:
+            cells = row_text(row)
+            name = cells[0] if cells else ""
+            answer = unwrap(cells[column] if len(cells) > column else "")
+            if not name:
+                continue
+            if RE_BARE_AFFIRMATIVE.match(answer):
+                partners.value += 1
+                partners.evidence.append(f"{name} - partner")
+            elif RE_BARE_NEGATIVE.match(answer):
+                associates.value += 1
+                associates.evidence.append(f"{name} - not a partner")
+            else:
+                unreadable.append(f"{name}: {answer!r}" if answer else name)
+
+    if not found:
+        message = "No 'Partner Y/N' column found in the Chambers lawyer table."
+        return Metric(value=None, notes=[message]), Metric(value=None, notes=[message])
+
+    for metric in (partners, associates):
+        metric.needs_check = True
+        if unreadable:
+            listed = ", ".join(shorten(u, 34) for u in unreadable[:4])
+            metric.notes.append(
+                f"{len(unreadable)} lawyer(s) answer the partner column with "
+                f"neither Y nor N: {listed}. Not counted either way."
+            )
+    return partners, associates
+
+
+def count_chambers_clients(tables: list[Table]) -> tuple[Metric, Metric]:
+    """Clients off the D0 (publishable) and E0 (confidential) tables.
+
+    The same two lists our own form asks for, under different headings and
+    with a numbering column in front of the name.
+    """
+    active, new = Metric(value=0), Metric(value=0)
+    unrecognised: list[str] = []
+    found = False
+
+    for table in tables:
+        if not RE_CHAMBERS_CLIENTS.match(table_label(table)):
+            continue
+        name_col = answer_col = None
+        start = 0
+        for index, row in enumerate(table.rows):
+            name_col = _column_of(row, RE_CHAMBERS_NAME_COL)
+            if name_col is not None:
+                answer_col = _column_of(row, RE_CHAMBERS_NEW_COL)
+                start = index + 1
+                break
+        if name_col is None:
+            continue
+        found = True
+        counted = 0
+        for row in table.rows[start:]:
+            cells = row_text(row)
+            name = cells[name_col] if len(cells) > name_col else ""
+            if not name or RE_NOT_APPLICABLE.match(name):
+                continue
+            counted += 1
+            active.value += 1
+            answer = unwrap(
+                cells[answer_col] if answer_col is not None
+                and len(cells) > answer_col else ""
+            )
+            if RE_AFFIRMATIVE.match(answer) or RE_NEW_WORD.match(answer):
+                new.value += 1
+            elif answer and not (RE_NEGATIVE.match(answer)
+                                 or RE_EXISTING_WORD.match(answer)):
+                unrecognised.append(answer)
+        active.evidence.append(f"{shorten(table_label(table), 48)} - {counted} client rows")
+
+    if not found:
+        message = "No Chambers client table (D0 or E0) found."
+        return Metric(value=None, notes=[message]), Metric(value=None, notes=[message])
+
+    new.evidence = list(active.evidence)
+    if unrecognised:
+        listed = ", ".join(repr(u) for u in sorted(set(unrecognised))[:4])
+        new.value = None
+        new.notes.append(
+            f"{len(unrecognised)} answer(s) could not be read as yes or no: "
+            f"{listed}. Count this column by hand."
+        )
+    for metric in (active, new):
+        metric.needs_check = True
+    return active, new
 
 
 def count_clients(tables: list[Table]) -> tuple[Metric, Metric]:
@@ -1119,6 +1269,33 @@ def parse_document(source: Any, filename: str | None = None) -> ParsedDocument:
         )
     else:
         result.warnings.extend(dropdown_warnings)
+
+    if is_chambers_form(tables, paragraphs):
+        result.chambers = True
+        result.warnings.append(
+            "Written on Chambers' submission form, not ours. Every figure is "
+            "read from a different shape of document - check them all."
+        )
+        active, new = count_chambers_clients(tables)
+        partners, associates = count_chambers_nominations(tables)
+        matters = count_matters(tables)
+        matters.needs_check = True
+        # Chambers' form has no next generation section at all, so there is
+        # nothing to count rather than none to find. Reporting 0 would be a
+        # claim the document does not support.
+        next_gen = Metric(
+            value=None,
+            notes=["Chambers' form has no next generation section."],
+        )
+        result.metrics = {
+            "matters": matters,
+            "active_clients": active,
+            "new_clients": new,
+            "lead_partners": partners,
+            "next_gen": next_gen,
+            "associates": associates,
+        }
+        return result
 
     if not looks_like_submission(tables):
         result.error = (

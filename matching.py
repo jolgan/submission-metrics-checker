@@ -1449,6 +1449,11 @@ def review_note(
     if is_checked(row, checked):
         return ""
 
+    if getattr(row.document, "chambers", False):
+        # One memo for the row rather than a reason per figure: on this form
+        # every figure is read differently, so every figure wants checking.
+        return "Chambers template used - check every figure"
+
     parts = []
     for metric in METRIC_KEYS:
         name = METRIC_COLUMNS[metric]
