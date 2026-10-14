@@ -339,6 +339,33 @@ It would fail on:
 No accuracy figure is claimed here. The app reports where it disagrees with the
 export; deciding which is right is still the checker's job.
 
+## Try it with the sample data
+
+Everything needed to see the app work is in `samples/synthetic/`, committed
+so it can be downloaded without running anything first:
+
+| File | What it is |
+|---|---|
+| `aldgate-fenwick_submission_2027_alpha.docx` and three more | submissions to recount |
+| `powerbi-export.xlsx` | the automated counts to check against |
+| `portal-export.xlsx` | the Staff Portal export, for file names and reference data |
+
+Open the [browser version](https://www.jolenegan.com/submission-metrics-checker/),
+drop in the four documents and both spreadsheets, and the table fills in. The
+figures are wrong in the export on purpose, so corrections show up green.
+
+For the pasted-page panel, paste these practice areas into the box:
+
+```
+Commercial property: Thames Valley
+EU and competition
+Banking and finance
+```
+
+The documents are invented, and so is every firm, person, client and figure
+in them. `alpha` and `alpha_v1` are deliberately the same submission twice,
+to show the newer one being kept.
+
 ## Sample data
 
 The repository contains **synthetic sample data only**. Every firm, person,

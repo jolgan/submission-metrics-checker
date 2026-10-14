@@ -1,0 +1,99 @@
+{
+  "documents": {
+    "aldgate-fenwick_submission_2027_alpha.docx": {
+      "firm": "Aldgate Fenwick LLP",
+      "firm_ref": "90001",
+      "region": "South East",
+      "practice_area": "Real estate > Commercial property: Thames Valley",
+      "expected": {
+        "matters": 5,
+        "active_clients": 5,
+        "new_clients": 1,
+        "lead_partners": 1,
+        "next_gen": 2,
+        "associates": 0
+      },
+      "export": {
+        "matters": 5,
+        "active_clients": 5,
+        "new_clients": 1,
+        "lead_partners": 1,
+        "next_gen": 0,
+        "associates": 0
+      }
+    },
+    "aldgate-fenwick_submission_2027_beta.docx": {
+      "firm": "Aldgate Fenwick LLP",
+      "firm_ref": "90001",
+      "region": "South West",
+      "practice_area": "Corporate and commercial > EU and competition",
+      "expected": {
+        "matters": 7,
+        "active_clients": 6,
+        "new_clients": 3,
+        "lead_partners": 2,
+        "next_gen": 1,
+        "associates": 2
+      },
+      "export": {
+        "matters": 6,
+        "active_clients": 6,
+        "new_clients": 3,
+        "lead_partners": 2,
+        "next_gen": 0,
+        "associates": 0
+      }
+    },
+    "aldgate-fenwick_submission_2027_gamma.docx": {
+      "firm": "Aldgate Fenwick LLP",
+      "firm_ref": "90001",
+      "region": "London",
+      "practice_area": "Finance > Banking and finance",
+      "expected": {
+        "matters": 4,
+        "active_clients": 3,
+        "new_clients": 2,
+        "lead_partners": 1,
+        "next_gen": 0,
+        "associates": 0
+      },
+      "export": {
+        "matters": 4,
+        "active_clients": 4,
+        "new_clients": 0,
+        "lead_partners": 1,
+        "next_gen": 0,
+        "associates": 0
+      }
+    }
+  },
+  "portal_rows_without_document": [
+    "Employment > Pensions"
+  ],
+  "firms": {
+    "alpha": "Aldgate Fenwick LLP",
+    "beta": "Aldgate Fenwick LLP",
+    "gamma": "Aldgate Fenwick LLP"
+  },
+  "superseded": {
+    "older": "aldgate-fenwick_submission_2027_alpha_v1.docx",
+    "newer": "aldgate-fenwick_submission_2027_alpha.docx",
+    "practice_area": "Real estate > Commercial property: Thames Valley"
+  },
+  "shared_document": {
+    "filename": "aldgate-fenwick_submission_2027_beta.docx",
+    "practice_area": "Corporate and commercial > EU and competition",
+    "portal_rows": 2
+  },
+  "other_firm": "Brackenmoor Legal",
+  "three_level_row": "Transport > Travel > Travel: personal injury",
+  "punctuated_table_row": {
+    "practice_area": "Electricity (and renewable energy)",
+    "table_name": "Electricity and renewable energy"
+  },
+  "derived_table_row": {
+    "practice_group": "City focus - Brasilia",
+    "practice_area": "Government relations",
+    "table_name": "City focus - Brasilia - Government relations"
+  }
+}
