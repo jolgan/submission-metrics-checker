@@ -268,6 +268,55 @@ nomination labelled `Associate : leading counsel 1`, and a matter's own team
 read as nine leading associates. Each one was a miscount that looked correct
 on screen.
 
+## Faults it was taught to catch
+
+Every entry below is a real miscount found in a real submission, each one
+looking perfectly correct on screen. Each became a test, so a later change
+cannot quietly undo the fix - and several did try: adding counsel nominations
+for one firm started counting barristers at another, and allowing plural roles
+briefly filed associates as partners. Both were caught by tests written for
+earlier bugs, before they reached anyone.
+
+### How documents are built
+
+| What the document did | What it cost | What happens now |
+|---|---|---|
+| Word merged two matter boxes into one table when the paragraph between them was deleted | 20 matters counted as 19, on 68 of 162 rows for one firm | Labels are counted wherever they appear, not only in the first row |
+| Word split a matter, leaving its label alone in one table and its body in the next | 22 matters counted as 13 | A label with nothing under it adopts the unlabelled table that follows |
+| A nomination sat inside a Word content control, invisible to a plain walk of the document | A whole category read as zero | The walk descends into content controls and nested tables |
+| Seven files stored a part as `customXML` where the index said `customXml` | Seven documents would not open at all | The package is rewritten to refer to itself consistently |
+
+### How firms fill them in
+
+| What the document did | What it cost | What happens now |
+|---|---|---|
+| `Yes (for this work type)` in the new-client column | 9 new clients counted as 6 | Answers are read by their leading word; anything unrecognised is flagged, not guessed |
+| `Sí`, `Si`, `Sim`, `Não` | The whole column read as uncountable | Spanish and Portuguese are read alongside English |
+| `N/A` written where a client name goes | Counted as a client | Recognised as "none", not as a company |
+| A memo to the researcher in place of the client list | Counted as a client | Flagged: the row answers nothing where its neighbours answer |
+| `ISSUERS` and `Initial Purchasers` as headings inside a client list | 63 clients counted as 66 | Same flag, judged per table so firms that leave the column blank throughout are not flagged wholesale |
+| Matter boxes left unnumbered, or written `#Matter 1`, `Confidential matter`, `Non-published matter` | The section was not found at all | All are recognised, while `Publishable matter summary` is not |
+
+### How nominations are worded
+
+| What the document did | What it cost | What happens now |
+|---|---|---|
+| `Counsel: leading counsel 1` | A nomination dropped in silence | Counsel counts as a leading associate, as the form's own instructions say |
+| `Associates: leading associate 1`, with the heading's plural | Five nominations dropped | Singular and plural are the same role |
+| `Partner 1: leading individual`, numbered before the colon | A firm's leading partners read as zero | The number may sit either side of the colon |
+| `Associate: Lucía Laganá` in a matter's team list | One leading associate counted as nine, then as eleven, then thirteen | A role label counts only inside a nomination box, never where it credits someone on a matter |
+| A description saying neither leading nor next generation | Would have had to be guessed | Reported by name and counted in neither category |
+
+### Matching and batches
+
+| What happened | What it cost | What happens now |
+|---|---|---|
+| A practice area named identically under two regions | The wrong export row matched, silently | Firm, region and practice area must all agree |
+| The portal's table name differing from its area only by brackets | 11 firms' submissions matched nothing | Levels are compared on their words, and every level below the practice group is indexed |
+| A firm resubmitting, leaving both rows on the portal page | Seven files chased that would be set aside on arrival | A row a newer submission replaces is not counted as still to download |
+| The Power BI dashboard renamed every column but one | The export would not load | Columns are resolved by alias, falling back to the last six, and a partial rename is refused rather than assumed |
+| A firm answering on Chambers' form instead | Three nomination counts read as zero | The form is read on its own terms, and every figure on it is flagged |
+
 ## Design decisions
 
 **Match on firm and practice area together, never practice area alone.** In one
