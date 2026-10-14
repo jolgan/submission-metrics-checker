@@ -4,9 +4,9 @@ A local Streamlit app that recounts six metrics from law firm submission
 documents and compares them against an automated extraction, highlighting only
 the figures that disagree.
 
-![The results table](docs/screenshots/results-table.png)
-
-*Screenshots live in `docs/screenshots/`.*
+**[Open it in your browser](https://www.jolenegan.com/submission-metrics-checker/)**
+- the same code compiled to WebAssembly, with nothing to install. Documents are
+read in the page and never leave the machine.
 
 ## The problem
 
