@@ -19,7 +19,7 @@ leading associates. An automated system reads those documents and writes six
 counts per submission into a Power BI export. Those counts are what this app
 checks.
 
-That extraction is unreliable, so a human re-checks it. Done by hand, that
+Those counts are unreliable, so a human re-checks them. Done by hand, that
 means opening every document, scrolling through tables that run to dozens of
 pages, counting rows, and comparing each figure against a spreadsheet, for a
 hundred or more documents per firm. It is slow, and it is exactly the kind of
