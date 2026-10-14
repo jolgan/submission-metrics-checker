@@ -1,8 +1,11 @@
 # Submission recount
 
 A local Streamlit app that recounts six metrics from law firm submission
-documents and compares them against an automated extraction, highlighting only
-the figures that disagree.
+documents and checks them against the figures an automated system produced,
+highlighting only those that disagree.
+
+Used on submissions from the United Kingdom and eight Latin American
+countries.
 
 **[Open it in your browser](https://www.jolenegan.com/submission-metrics-checker/)**
 - the same code compiled to WebAssembly, with nothing to install. Documents are
@@ -13,7 +16,8 @@ read in the page and never leave the machine.
 Law firms submit Word documents describing their practice: client lists, work
 highlights, and nominations for leading partners, next generation partners and
 leading associates. An automated system reads those documents and writes six
-counts per submission into a Power BI export.
+counts per submission into a Power BI export. Those counts are what this app
+checks.
 
 That extraction is unreliable, so a human re-checks it. Done by hand, that
 means opening every document, scrolling through tables that run to dozens of
