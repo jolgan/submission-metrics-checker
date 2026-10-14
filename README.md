@@ -56,17 +56,30 @@ Each metric maps to one Power BI column:
 
 | Column | Export column | Counted from |
 |---|---|---|
-| `MATTERS` | `NUM_MATTERS` | tables labelled `Publishable matter N` / `Non-publishable matter N` |
+| `MATTERS` | `NUM_MATTERS` | matter boxes, however the firm has labelled them: numbered or not, `#Matter`, `Confidential matter`, `Non-published matter` |
 | `CLIENTS` | `NUM_ACTIVE_CLIENTS` | rows of the `Active key clients` tables, publishable and not |
-| `NEW` | `NUM_NEW_CLIENTS` | the yes/no column of those same tables |
-| `LPs` | `NUM_LEAD_PARTNERS` | nominations labelled `Partner: leading ...` |
-| `NGs` | `NUM_NEXT_GEN` | nominations labelled `Partner: next generation ...` |
-| `LAs` | `NUM_ASSOCIATES` | nominations labelled `Associate: ...` |
+| `NEW` | `NUM_NEW_CLIENTS` | the yes/no column of those same tables, in English, Spanish or Portuguese |
+| `LPs` | `NUM_LEAD_PARTNERS` | nominations whose role is partner and whose description says leading |
+| `NGs` | `NUM_NEXT_GEN` | nominations whose role is partner and whose description says next generation |
+| `LAs` | `NUM_ASSOCIATES` | nominations whose role is associate or counsel |
 
 Everything anchors on the label in a table's first cell. Section headings are
 not usable: one submission files its associate nominations under a heading
 reading "Your team - Partners: leading partners". Neither are the numbers in
 those labels, which repeat and skip.
+
+A label is read for its role and its description separately, because firms
+write both freely: `Associates: leading associate 1` carries the heading's
+plural, `Partner 1: leading individual` numbers the box before the colon, and
+`Counsel: leading counsel 1` uses a role the form's own instructions put in
+the associates section.
+
+Where the label sits matters as much as what it says. A matter box lists the
+team that worked on it, and firms write the role into the name cell -
+`Associate: Lucia Lagana` - which reads exactly like a nomination. Those are
+left out, identified by the matter label or the `Other key team members`
+heading above them, either of which Word may have split into a table of its
+own.
 
 The practice area is not in a paragraph or a table either. It is a Word dropdown
 holding `Region - Practice group - Practice area`, and firms often leave it
