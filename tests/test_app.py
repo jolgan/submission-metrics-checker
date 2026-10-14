@@ -502,7 +502,7 @@ def test_the_heading_is_discreet():
     """The table is the point of the page, not the name of the tool."""
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
     assert not at.title, "st.title is fixed at a size that dominates the page"
-    heading = next(m.value for m in at.markdown if "Submission recount" in m.value)
+    heading = next(m.value for m in at.markdown if "Submission data validation" in m.value)
     assert "opacity" in heading and "font-size" in heading
 
 

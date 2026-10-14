@@ -46,7 +46,7 @@ GREEN = "#C6EFCE"
 AMBER = "#FFE9A8"
 ON_FILL = "#1A1A1A"
 
-st.set_page_config(page_title="Submission recount", page_icon="📋", layout="wide")
+st.set_page_config(page_title="Submission data validation", page_icon="📋", layout="wide")
 
 
 # --- cached loaders ---------------------------------------------------------
@@ -199,7 +199,7 @@ with heading:
         """
         <div style="font-size:1.15rem; font-weight:600; opacity:0.55;
                     letter-spacing:0.01em; margin:0 0 0.15rem 0;">
-          Submission recount
+          Submission data validation
         </div>
         """,
         unsafe_allow_html=True,
