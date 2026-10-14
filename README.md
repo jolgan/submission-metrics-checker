@@ -228,15 +228,17 @@ launching the app.
 python -m pytest tests/ -q
 ```
 
-295 tests, running against `samples/synthetic/` alone, so a clone can run them
+559 tests, running against `samples/synthetic/` alone, so a clone can run them
 without any confidential data. Expected figures come from
 `samples/synthetic/manifest.json`, written by the same script that builds the
 documents, so the two cannot drift apart.
 
 Many of the tests pin a specific fault found in a real submission: two matters
-sharing one table, an answer reading `Yes (for this work type)`, a client row
-reading `N/A`, a nomination labelled `Associate : leading counsel 1`. Each one
-was a miscount that looked correct on screen.
+sharing one table, a matter whose label Word split away from its body, an
+answer reading `Yes (for this work type)`, a client row reading `N/A`, a
+nomination labelled `Associate : leading counsel 1`, and a matter's own team
+read as nine leading associates. Each one was a miscount that looked correct
+on screen.
 
 ## Design decisions
 
