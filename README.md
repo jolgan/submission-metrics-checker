@@ -270,7 +270,23 @@ uncounted and named, because the two categories are not interchangeable.
 
 ## Limitations
 
-Handles the Legal 500 UK submission template as firms return it, including:
+### A competitor's form
+
+A few firms answer on Chambers' submission form instead. It asks for the same
+things in a different shape: one row per lawyer with a `Partner Y/N` column
+in place of a box per nomination, and client lists headed `D0 - PUBLISHABLE
+CLIENTS` and `E0 - CONFIDENTIAL CLIENTS`. Y reads as a leading partner and N
+as a leading associate.
+
+It is recognised by its own section codes and upload address, never by our
+template's tables being absent - otherwise a document of ours that failed to
+parse would be silently counted the wrong way. Every figure on such a
+submission is flagged whatever it counts, and the row reads
+`Chambers template used - check every figure`.
+
+### What it handles, and what it does not
+
+Handles the submission template as firms return it, including:
 merged tables, nominations inside Word content controls, repeated header rows
 inside client tables, `New`/`Existing` in place of `Yes`/`No`, qualified answers
 such as `Yes (for this work type)`, `N/A` in a client column, numbering that
@@ -279,9 +295,10 @@ capitalised.
 
 It would fail on:
 
-- a different submission template, or a substantial redesign of this one. The
-  parser anchors on label text such as `Publishable matter 1` and
-  `Active key clients`; rename those and it finds nothing.
+- a submission template other than the two it knows. It reads the Legal 500
+  form and Chambers' form; anything else anchors on label text such as
+  `Publishable matter 1` and `Active key clients`, and renaming those leaves
+  it with nothing to find.
 - a practice area whose row cannot be identified. If a firm leaves the dropdown
   unset and the file name is absent from the Staff Portal export, there is
   nothing left to identify the row by, and it is reported unmatched.
