@@ -212,6 +212,8 @@ parsing.py                    reads .docx and counts; no Streamlit import
 matching.py                   loads both exports, normalises, joins, reconciles
 export_writer.py              builds the highlighted .xlsx
 docx_repair.py                opens packages with inconsistent internal names
+index.html                    runs the same app in a browser, via stlite
+check_batch.py                command line: which documents a batch is missing
 diagnose.py                   command line: what the parser saw in one document
 compare_exports.py            command line: what changed between two exports
 tools/make_synthetic_samples.py   generates the sample data
@@ -221,6 +223,15 @@ tests/                        pytest suite
 
 Parsing and matching hold no Streamlit import, so both are testable without
 launching the app.
+
+`check_batch.py` answers the question that comes up on every batch: a browser
+reports every document downloaded, the folder holds fewer, and nothing says
+which. It names them, and sets aside the ones a newer submission has already
+replaced so they are not chased for nothing.
+
+```bash
+python check_batch.py "Example Firm"
+```
 
 ## Testing
 
