@@ -857,6 +857,43 @@ def continuation_of(tables: list[Table], index: int) -> Table | None:
     return following
 
 
+RE_MATTER_CLIENT_HEAD = re.compile(r"^name of client", re.I)
+RE_MATTER_SECTOR_HEAD = re.compile(r"^industry sector", re.I)
+
+
+def matter_has_content(table: Table, start: int, end: int) -> bool:
+    """Whether a matter box has been filled in, rather than left as template.
+
+    An untouched box is not blank. It carries the form's own field labels and
+    its instructions to the firm - "Name of client", "Matter description",
+    "Please describe your team's role" - so asking merely whether the rows hold
+    text counts every empty template as a matter. One firm's submissions each
+    carried one, so every document in the batch was over by one, reported as a
+    confident correction against the export.
+
+    What makes a matter real is a client. Where the box names the column, the
+    cell beneath it decides; where it does not, there is nothing better to go
+    on than whether anything is there at all.
+    """
+    for index in range(start, end):
+        cells = row_text(table.rows[index])
+        if not cells or not RE_MATTER_CLIENT_HEAD.match(cells[0]):
+            continue
+        # The client sits either beside the heading or in the row beneath it,
+        # depending on how the box is laid out. "Industry sector" is the other
+        # heading, not an answer.
+        beside = [
+            cell for cell in cells[1:]
+            if cell.strip() and not RE_MATTER_SECTOR_HEAD.match(cell)
+        ]
+        if beside:
+            return True
+        if index + 1 >= end:
+            return False
+        return any(cell.strip() for cell in row_text(table.rows[index + 1]))
+    return rows_have_content(table, start, end)
+
+
 def count_matters(tables: list[Table]) -> Metric:
     """Count work matters: one label per matter, publishable and not.
 
@@ -874,13 +911,13 @@ def count_matters(tables: list[Table]) -> Metric:
         if len(segments) > 1:
             merged += len(segments) - 1
         for label, start, end in segments:
-            if not rows_have_content(table, start, end):
+            if not matter_has_content(table, start, end):
                 # The label may have been split from its body, which then
                 # follows as the next table with no label of its own.
                 body = None
                 if start >= len(table.rows) and index + 1 not in adopted:
                     body = continuation_of(tables, index)
-                if body is None:
+                if body is None or not matter_has_content(body, 0, len(body.rows)):
                     empty += 1
                     continue
                 adopted.add(index + 1)

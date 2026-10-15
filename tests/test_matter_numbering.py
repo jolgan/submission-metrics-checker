@@ -397,9 +397,15 @@ def test_a_red_box_not_laid_out_as_a_matter_is_not_counted(tmp_path):
     document.add_paragraph("Firm Name")
     document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
     for label in ("Publishable matter 1", "Important note"):
-        table = document.add_table(rows=2, cols=1)
+        table = document.add_table(rows=2, cols=2)
         table.rows[0].cells[0].text = label
-        table.rows[1].cells[0].text = "Name of client" if label.startswith("Pub") else "Some text"
+        # The matter needs a client in it, or it is an empty template and is
+        # skipped before its colour is ever considered.
+        if label.startswith("Pub"):
+            table.rows[1].cells[0].text = "Name of client"
+            table.rows[1].cells[1].text = "A Client Ltd"
+        else:
+            table.rows[1].cells[0].text = "Some text"
         shade(table.rows[0].cells[0], RED)
     path = tmp_path / "note.docx"
     document.save(path)
@@ -423,3 +429,91 @@ def test_matter_colour_is_judged_by_hue():
         assert matter_colour(Box(fill).table) == "Publishable", fill
     for fill in ("D0CECE", "FFFFFF", "FFF2CC", "DAE8F8"):
         assert matter_colour(Box(fill).table) is None, fill
+
+
+# --- a box the firm never filled in ----------------------------------------
+
+
+def matter_box(document, label, client=None, description=None):
+    """A matter box as the form ships it, filled in or not.
+
+    An untouched box is not blank: it carries the form's field headings and
+    its instructions to the firm, which is what made every one of them count.
+    """
+    table = document.add_table(rows=6, cols=2)
+    table.rows[0].cells[0].text = label
+    table.rows[1].cells[0].text = "Name of client"
+    table.rows[1].cells[1].text = "Industry sector"
+    table.rows[2].cells[0].text = client or ""
+    table.rows[3].cells[0].text = "Matter description"
+    table.rows[4].cells[0].text = (
+        description or "Please describe your team's role and what made it notable."
+    )
+    table.rows[5].cells[0].text = "Deal value"
+    return table
+
+
+def boxes(tmp_path, specs, name="boxes.docx"):
+    document = Document()
+    document.add_paragraph("Firm Name")
+    document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
+    clients = document.add_table(rows=2, cols=2)
+    clients.rows[0].cells[0].text = "Active key clients (over the last 12 months)"
+    clients.rows[0].cells[1].text = "New client (yes/no)"
+    clients.rows[1].cells[0].text = "A Client Ltd"
+    clients.rows[1].cells[1].text = "Yes"
+    for label, client in specs:
+        matter_box(document, label, client)
+    path = tmp_path / name
+    document.save(path)
+    return parse_document(path).metrics["matters"]
+
+
+def test_an_untouched_template_box_is_not_a_matter(tmp_path):
+    """The reported shape: 14 matters counted as 15, on every document."""
+    metric = boxes(tmp_path, [
+        ("Publishable matter", None),
+        ("Non-publishable matter", "A Client Ltd"),
+        ("Non-publishable matter", "B Client Ltd"),
+    ])
+    assert metric.value == 2
+    assert any("empty matter template" in n for n in metric.notes)
+
+
+def test_the_form_s_own_instructions_do_not_fill_a_box(tmp_path):
+    """"Please describe your team's role" is the form talking, not the firm."""
+    metric = boxes(tmp_path, [("Publishable matter 1", None)])
+    assert metric.value == 0
+
+
+def test_a_named_client_is_what_makes_a_matter(tmp_path):
+    metric = boxes(tmp_path, [("Publishable matter 1", "A Client Ltd")])
+    assert metric.value == 1
+
+
+def test_a_client_beside_the_heading_counts_too(tmp_path):
+    """Some boxes put the client next to the heading rather than beneath it."""
+    document = Document()
+    document.add_paragraph("Firm Name")
+    document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
+    table = document.add_table(rows=2, cols=2)
+    table.rows[0].cells[0].text = "Publishable matter 1"
+    table.rows[1].cells[0].text = "Name of client"
+    table.rows[1].cells[1].text = "A Client Ltd"
+    path = tmp_path / "beside.docx"
+    document.save(path)
+    assert parse_document(path).metrics["matters"].value == 1
+
+
+def test_a_box_naming_no_client_column_falls_back(tmp_path):
+    """Chambers' form lays a matter out differently and must still count."""
+    document = Document()
+    document.add_paragraph("Firm Name")
+    document.add_table(rows=1, cols=1).rows[0].cells[0].text = "Example Firm LLP"
+    table = document.add_table(rows=3, cols=2)
+    table.rows[0].cells[0].text = "Publishable matter 1"
+    table.rows[1].cells[0].text = "E1 Name of the client (for ranking purposes)"
+    table.rows[2].cells[0].text = "A Client Ltd"
+    path = tmp_path / "other.docx"
+    document.save(path)
+    assert parse_document(path).metrics["matters"].value == 1

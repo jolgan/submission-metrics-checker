@@ -296,6 +296,7 @@ earlier bugs, before they reached anyone.
 | A memo to the researcher in place of the client list | Counted as a client | Flagged: the row answers nothing where its neighbours answer |
 | `ISSUERS` and `Initial Purchasers` as headings inside a client list | 63 clients counted as 66 | Same flag, judged per table so firms that leave the column blank throughout are not flagged wholesale |
 | Matter boxes left unnumbered, or written `#Matter 1`, `Confidential matter`, `Non-published matter` | The section was not found at all | All are recognised, while `Publishable matter summary` is not |
+| A matter box left exactly as the form ships it, carrying its field headings and the instruction "Please describe your team's role" | Every document in a firm's batch counted one matter too many | A matter counts when a client is named in it, not when the box holds any text at all |
 
 ### How nominations are worded
 
