@@ -122,6 +122,25 @@ not found" or opens the Microsoft Store, install Python from
 <https://www.python.org/downloads/> and tick **"Add Python to PATH"** on the
 first screen of the installer.
 
+### Before you start (Windows, first time only)
+
+You need Python, and optionally Git. If you already have them, skip to "First time: download and set up".
+
+**1. Python 3.12 or newer.** Install it from https://www.python.org/downloads/. If the "Python install manager" appears, answer its prompts like this:
+
+- "Update setting now?" (long paths): **N**
+- "Add commands directory to your PATH?": **Y**
+- "Install CPython now?": **Y**
+
+Then close PowerShell, open a new window, and run `python --version`. It should print 3.12 or higher.
+
+**2. Get the code (pick one).**
+
+- **Easiest, no Git needed:** on this page click **Code > Download ZIP** and extract it. In PowerShell, `cd` into the extracted folder (probably `submission-metrics-checker-main`). Then follow "First time: download and set up", skipping the `git clone` line and the first `cd` line.
+- **With Git:** run `winget install --id Git.Git -e`, then close and reopen PowerShell and check `git --version`. If winget isn't available, install Git from https://git-scm.com/download/win.
+
+If the install asks for administrator rights you don't have, ask your IT team, or use the browser version described under "No installing at all".
+
 ### Where the commands go
 
 - **Windows:** PowerShell (press Start, type `powershell`).
@@ -210,6 +229,8 @@ line when it is. Run the activate line for your system and try again.
 **"Port 8501 is already in use"** - the app is already running in another
 terminal. Open <http://127.0.0.1:8501>, or start this one on a different port
 with `streamlit run app.py --server.port 8502`.
+
+**"git is not recognized":** Git isn't installed, or PowerShell wasn't closed and reopened after installing it. See "Before you start" above.
 
 ### No installing at all
 
